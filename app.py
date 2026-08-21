@@ -13,18 +13,32 @@ db.init_db()
 theme.inject_css()
 
 # Streamlit Community Cloud's free tier shows a "Hosted with Streamlit"
-# badge to every visitor — it's not owner-only chrome like the Share/Fork
-# tools, and there's no official setting to turn it off (it's the
-# attribution that comes with free hosting). This is a community-documented
-# workaround, not something Streamlit provides support for: unlike
-# st.markdown, components.html actually executes <script> tags (it renders
-# in a real iframe with srcdoc, not via innerHTML), and window.top reaches
-# up out of that iframe to the actual outer page where the badge lives.
-# If Streamlit changes their page structure this may stop matching and
-# need updating — it's a visual hide, not a real removal.
+# badge, and — for apps deployed from a public repo — a "Fork" option, to
+# every visitor. Neither is owner-only chrome, and there's no official
+# setting to turn either off (the Fork option specifically requires the
+# GitHub repo to be public, which is what enables it — the only fully
+# reliable way to remove it is a private repo, which on the free tier means
+# named-viewer-only access instead of one link anyone can open). This is a
+# community-documented workaround, not something Streamlit provides support
+# for: unlike st.markdown, components.html actually executes <script> tags
+# (it renders in a real iframe with srcdoc, not via innerHTML), and
+# window.top reaches up out of that iframe to the actual outer page where
+# this chrome lives. The Fork-matching half of this is a best-effort text
+# match (Community Cloud doesn't expose a stable selector for it the way
+# the streamlit.io-linked badge has), so it's less certain to keep working
+# than the badge hide — if Streamlit changes their page structure either
+# one may stop matching and need updating; this hides them visually, it
+# doesn't actually remove the underlying feature.
 components.html(
-    '<script>window.top.document.querySelectorAll(\'[href*="streamlit.io"]\').'
-    'forEach(function(e){e.style.display="none";});</script>',
+    '<script>'
+    'window.top.document.querySelectorAll(\'[href*="streamlit.io"]\').'
+    'forEach(function(e){e.style.display="none";});'
+    'Array.from(window.top.document.querySelectorAll("button,a,span,div")).'
+    'forEach(function(e){'
+    'if(e.children.length===0&&e.textContent.trim()==="Fork"){'
+    'var c=e.closest("div");if(c)c.style.display="none";else e.style.display="none";'
+    '}});'
+    '</script>',
     height=0,
 )
 
