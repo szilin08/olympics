@@ -279,6 +279,39 @@ def inject_css():
             color: #f0c874 !important;
         }}
 
+        /* st.dialog modal (the "Match scoring" popup) — same root cause as
+           the dropdown above: the dialog's content card sits directly on
+           the page <body>'s background, which Streamlit fixes to dark navy
+           via config.toml's base="dark" independent of our light/dark
+           toggle. Confirmed via computed styles: the card is rgb(10,14,23)
+           regardless of mode, so in light mode all its text — headings,
+           captions, category labels, score numbers — was inheriting the
+           light-mode dark-brown ink from the global `p, span, div, label`
+           rule and going nearly invisible on that dark card. Pin the card
+           and its text to fixed, always-legible dark-theme colors.
+           Buttons get their own explicit dark-styled rule (below, higher
+           specificity so it wins) rather than being excluded from the text
+           rule — an earlier version tried excluding them with :not() but
+           still let their background fall through to the light-mode CARD
+           (white), which combined with this rule's light text produced
+           invisible white-on-white +/- buttons. */
+        [data-testid="stDialog"] > div {{
+            background: #0a0e17 !important;
+        }}
+        [data-testid="stDialog"] :is(p, span, div, label, h1, h2, h3, h4, input) {{
+            color: #e8eaf0 !important;
+        }}
+        [data-testid="stDialog"] hr {{ border-color: rgba(255,255,255,.16) !important; }}
+        [data-testid="stDialog"] .stButton button {{
+            background: #171d2e !important; color: #e8eaf0 !important;
+            border: 1px solid rgba(255,255,255,.18) !important;
+        }}
+        [data-testid="stDialog"] .stButton button * {{ color: inherit !important; }}
+        [data-testid="stDialog"] .stButton button:hover {{
+            border-color: {GOLD} !important; color: {GOLD_LT} !important;
+        }}
+        [data-testid="stDialog"] .stButton button:disabled {{ opacity: .4 !important; }}
+
         /* ── TABS ── */
         button[data-baseweb="tab"] {{ border-radius: 8px 8px 0 0; font-weight: 700; color: {MUTED}; }}
         button[data-baseweb="tab"][aria-selected="true"] {{ color: {GOLD_DK} !important; border-bottom: 3px solid {GOLD} !important; }}
