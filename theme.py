@@ -255,6 +255,30 @@ def inject_css():
         }}
         .stTextInput input::placeholder {{ color: {MUTED} !important; }}
 
+        /* selectbox dropdown popover (Team A / Team B dept picker) — this
+           overlay always renders with a fixed dark-navy background no
+           matter which light/dark mode is toggled (confirmed via computed
+           styles: rgb(10,14,23) either way), but the option text was
+           following the page's global `p, span, div, label {{ color: INK }}`
+           rule above, which flips to a dark brown in light mode — dark text
+           on a dark box, unreadable. Pin this popover to fixed, always-legible
+           colors instead of the theme variable so it's correct in both modes. */
+        [data-testid="stSelectboxVirtualDropdown"] {{
+            background: #0a0e17 !important; border: 1px solid rgba(255,255,255,.16) !important;
+        }}
+        [data-testid="stSelectboxVirtualDropdown"] [role="option"],
+        [data-testid="stSelectboxVirtualDropdown"] [role="option"] * {{
+            color: #e8eaf0 !important; background: transparent !important;
+        }}
+        [data-testid="stSelectboxVirtualDropdown"] [role="option"]:hover,
+        [data-testid="stSelectboxVirtualDropdown"] [role="option"][aria-selected="true"] {{
+            background: rgba(217,154,43,.20) !important;
+        }}
+        [data-testid="stSelectboxVirtualDropdown"] [role="option"]:hover *,
+        [data-testid="stSelectboxVirtualDropdown"] [role="option"][aria-selected="true"] * {{
+            color: #f0c874 !important;
+        }}
+
         /* ── TABS ── */
         button[data-baseweb="tab"] {{ border-radius: 8px 8px 0 0; font-weight: 700; color: {MUTED}; }}
         button[data-baseweb="tab"][aria-selected="true"] {{ color: {GOLD_DK} !important; border-bottom: 3px solid {GOLD} !important; }}
