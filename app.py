@@ -23,21 +23,36 @@ theme.inject_css()
 # for: unlike st.markdown, components.html actually executes <script> tags
 # (it renders in a real iframe with srcdoc, not via innerHTML), and
 # window.top reaches up out of that iframe to the actual outer page where
-# this chrome lives. The Fork-matching half of this is a best-effort text
-# match (Community Cloud doesn't expose a stable selector for it the way
-# the streamlit.io-linked badge has), so it's less certain to keep working
-# than the badge hide — if Streamlit changes their page structure either
-# one may stop matching and need updating; this hides them visually, it
-# doesn't actually remove the underlying feature.
+# this chrome lives.
+#
+# An earlier version walked up a fixed 3 ancestor levels from any element
+# whose text was "Fork" to clear a wrapping pill background. Tested against
+# a mock toolbar with the icon+text nesting this kind of chrome actually
+# uses, that fixed-depth walk overshot past the toolbar entirely and hid
+# <body> — a blank page for every visitor. This version only ever hides a
+# LEAF element (no child elements of its own) whose own trimmed text is
+# exactly "Fork", never climbing to any ancestor — verified against that
+# same mock to correctly hide the word without touching surrounding
+# content, even a deliberately similar "Fork lift operator training"
+# button. It also polls every 800ms rather than running once, since
+# Community Cloud appears to inject this toolbar asynchronously after the
+# page's initial render. The trade-off: a small empty pill outline may
+# remain next to the "⋮" menu rather than disappearing entirely — worth it
+# for guaranteed safety over a cosmetic remnant. Still a visual hide via
+# best-effort text matching, not a real removal — if Streamlit changes
+# their page structure this may need updating again.
 components.html(
     '<script>'
-    'window.top.document.querySelectorAll(\'[href*="streamlit.io"]\').'
-    'forEach(function(e){e.style.display="none";});'
-    'Array.from(window.top.document.querySelectorAll("button,a,span,div")).'
-    'forEach(function(e){'
+    'function lbsHideCloudChrome(){'
+    'var doc=window.top.document;'
+    'doc.querySelectorAll(\'[href*="streamlit.io"]\').forEach(function(e){e.style.display="none";});'
+    'Array.from(doc.querySelectorAll("button,a,span,div")).forEach(function(e){'
     'if(e.children.length===0&&e.textContent.trim()==="Fork"){'
-    'var c=e.closest("div");if(c)c.style.display="none";else e.style.display="none";'
+    'e.style.display="none";'
     '}});'
+    '}'
+    'lbsHideCloudChrome();'
+    'setInterval(lbsHideCloudChrome,800);'
     '</script>',
     height=0,
 )
