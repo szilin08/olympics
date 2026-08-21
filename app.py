@@ -58,8 +58,9 @@ def main():
             unsafe_allow_html=True,
         )
         st.markdown(
-            """
+            f"""
             <div class="sb-logo-wrap">
+                <div class="sb-crest">{assets.crest_svg(120)}</div>
                 <div class="sb-logo-title">LBS <span class="sb-logo-x">×</span> MGB</div>
                 <div class="sb-logo-sub">Sports Tournament</div>
             </div>

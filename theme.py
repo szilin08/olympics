@@ -415,6 +415,7 @@ def inject_css():
         .sb-partner-logo img {{ width: 100%; display: block; }}
 
         .sb-logo-wrap {{ padding:8px 0 22px 0; border-bottom:1px solid {SB_BORDER}; margin-bottom:16px; text-align:center; }}
+        .sb-crest {{ display:flex; justify-content:center; margin-bottom:12px; filter:drop-shadow(0 3px 8px rgba(0,0,0,.25)); }}
         .sb-logo-title {{ font-weight:700; color:{SB_TEXT_HI}; font-size:21px; line-height:1.2; letter-spacing:.01em; }}
         .sb-logo-title .sb-logo-x {{ color:{GOLD}; font-weight:600; font-style:italic; font-family:'Playfair Display',serif; padding:0 3px; }}
         .sb-logo-sub {{ font-size:10px; color:{GOLD_DK}; letter-spacing:.28em; font-weight:700; margin-top:6px;
