@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 
 import assets
 import auth
@@ -10,6 +11,22 @@ import pages_admin
 st.set_page_config(page_title="LBS × MGB Sports Tournament", page_icon="🏆", layout="wide")
 db.init_db()
 theme.inject_css()
+
+# Streamlit Community Cloud's free tier shows a "Hosted with Streamlit"
+# badge to every visitor — it's not owner-only chrome like the Share/Fork
+# tools, and there's no official setting to turn it off (it's the
+# attribution that comes with free hosting). This is a community-documented
+# workaround, not something Streamlit provides support for: unlike
+# st.markdown, components.html actually executes <script> tags (it renders
+# in a real iframe with srcdoc, not via innerHTML), and window.top reaches
+# up out of that iframe to the actual outer page where the badge lives.
+# If Streamlit changes their page structure this may stop matching and
+# need updating — it's a visual hide, not a real removal.
+components.html(
+    '<script>window.top.document.querySelectorAll(\'[href*="streamlit.io"]\').'
+    'forEach(function(e){e.style.display="none";});</script>',
+    height=0,
+)
 
 VIEWER_PAGES = [
     ("Home", "🏠", pages_public.render_overview),
