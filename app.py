@@ -20,7 +20,6 @@ VIEWER_PAGES = [
 ADMIN_PAGES = [
     ("Badminton — Admin", "🎯", pages_admin.render_badminton_admin),
     ("Pickleball — Admin", "📝", pages_admin.render_pickleball_admin),
-    ("Schedule & Settings", "⚙️", pages_admin.render_settings),
 ]
 
 
@@ -41,10 +40,13 @@ def main():
     available = dict((label, fn) for label, _, fn in VIEWER_PAGES)
     if auth.is_admin():
         available.update((label, fn) for label, _, fn in ADMIN_PAGES)
-    else:
-        # Bounce back to Home if admin logged out while on an admin-only page.
-        if st.session_state["current_page"] not in available:
-            st.session_state["current_page"] = "Home"
+
+    # Bounce back to Home if the current page no longer exists — either the
+    # admin logged out while on an admin-only page, or (as with the removed
+    # Schedule & Settings page) a page was retired while someone's session
+    # still pointed at it.
+    if st.session_state["current_page"] not in available:
+        st.session_state["current_page"] = "Home"
 
     with st.sidebar:
         st.markdown(
