@@ -61,7 +61,7 @@ def render_overview():
          "💡 Toggle between the connected-line bracket and the dark live monitor.", "Badminton"),
         (m2, "cc-card-teal", "🏓", "View 02", "Pickleball", "Group-stage standings and knockout bracket for all 22 pairs across 4 groups.",
          "💡 Top 4 per group advance automatically once standings are updated.", "Pickleball"),
-        (m3, "cc-card-purple", "🔐", "View 03", "Admin Login", "Score entry, team setup, and schedule management — behind the shared admin password.",
+        (m3, "cc-card-purple", "🔐", "View 03", "Admin Login", "Score entry and team setup — behind the shared admin password.",
          "💡 Unlock admin mode from the sidebar to see this.", None),
     ]
     for col, cls, icon, step, title, desc, tip, target in modules:
