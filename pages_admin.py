@@ -56,11 +56,65 @@ import streamlit.components.v1 as components
 import bracket_svg
 
 
+def _render_backup_restore_panel():
+    """Temporary migration aid — NOT part of the normal tournament workflow.
+    Export current bd/pk/schedule state as a JSON file (works regardless of
+    which db.py backend is active), and restore it back in after swapping
+    the storage backend (e.g. SQLite -> MongoDB) so no live data is lost.
+    Safe to delete this whole function + its call site once the migration
+    is done and confirmed working.
+    """
+    import json
+    import datetime as _dt
+
+    with st.expander("🗄️ Data Backup / Restore (for storage migration)", expanded=False):
+        st.caption(
+            "Use **Export** to download everything currently saved (bracket, groups, schedule) as one "
+            "JSON file before switching storage backends. Use **Restore** after the switch to load that "
+            "same JSON back in — this replaces current bd/pk/schedule state with what's in the file."
+        )
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            backup = {
+                "exported_at": _dt.datetime.utcnow().isoformat() + "Z",
+                "bd": state.load_bd(),
+                "pk": state.load_pk(),
+                "schedule": state.load_schedule(),
+            }
+            st.download_button(
+                "⬇️ Export current data",
+                data=json.dumps(backup, indent=2),
+                file_name=f"tournament_backup_{_dt.date.today().isoformat()}.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+
+        with col2:
+            uploaded = st.file_uploader("Restore from a backup file", type=["json"], key="restore_upload")
+            if uploaded is not None:
+                st.session_state["_pending_restore"] = json.load(uploaded)
+
+            if st.session_state.get("_pending_restore"):
+                st.warning("This will OVERWRITE current bd/pk/schedule data with the uploaded file's contents.")
+                if st.button("⚠️ Confirm restore", type="primary", use_container_width=True):
+                    payload = st.session_state["_pending_restore"]
+                    actor = st.session_state.get("admin_name", "admin")
+                    state.save_bd(payload["bd"], actor=actor, action="restore_from_backup")
+                    state.save_pk(payload["pk"], actor=actor, action="restore_from_backup")
+                    state.save_schedule(payload["schedule"], actor=actor)
+                    st.session_state["_pending_restore"] = None
+                    st.success("Restored. Reload the page to see it everywhere.")
+
+
 def render_badminton_admin():
     auth.require_admin()
     ui.page_header("Home / Badminton", "Badminton — Admin",
                     "16 departments · Double elimination · First to 3 category wins · 15 pts (21 from semis)",
                     "Admin mode", "navy")
+
+    _render_backup_restore_panel()
 
     bd = state.load_bd()
 
