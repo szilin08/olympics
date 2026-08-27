@@ -71,16 +71,28 @@ def leaderboard_row(rank, name, subtitle, pills, pct, bar_color="#1a4fba", tag="
     )
 
 
+CLEAR_OPTION = "— Clear / unassign —"
+
+
 def dept_combobox(label, value, key, on_change, args, placeholder="Dept / Team"):
     """A dropdown that also accepts free-text (Streamlit's combobox mode).
     Pre-seeds session_state so a previously-saved custom (non-roster) name still
     shows correctly even though it isn't one of the dropdown options.
+
+    Plain st.selectbox has no built-in way to clear a value once one is set —
+    even with accept_new_options=True, there's no "x" to blank it back out
+    (a long-standing Streamlit limitation, not something specific to this
+    widget). CLEAR_OPTION is a sentinel entry pinned to the top of the list
+    so admins have an explicit way to unassign a team; the on_change callback
+    is responsible for translating it to None before saving (see
+    pages_admin._bd_team_change).
     """
     import data
     if key not in st.session_state:
         st.session_state[key] = value or None
+    options = [CLEAR_OPTION] + data.all_dept_names()
     return st.selectbox(
-        label, options=data.all_dept_names(), key=key, accept_new_options=True,
+        label, options=options, key=key, accept_new_options=True,
         placeholder=placeholder, on_change=on_change, args=args, label_visibility="collapsed",
     )
 
