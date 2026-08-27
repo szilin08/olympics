@@ -14,8 +14,16 @@ PK_PTS = 15  # pickleball is always best-of-3 to 15, per the tournament rules
 # ───────────────────────── badminton callbacks ─────────────────────────
 
 def _bd_team_change(tie_id, which, key):
+    val = st.session_state[key]
+    if val == ui.CLEAR_OPTION:
+        # Sentinel picked from the dropdown to unassign a team — normalize
+        # both the saved value and the widget's own state back to None so
+        # the box shows its placeholder again on the next render, instead
+        # of getting stuck displaying the literal "— Clear / unassign —" text.
+        val = None
+        st.session_state[key] = None
     bd = state.load_bd()
-    logic.bd_set_team(bd, tie_id, which, st.session_state[key])
+    logic.bd_set_team(bd, tie_id, which, val)
     state.save_bd(bd, actor=st.session_state.get("admin_name", "admin"), action=f"set_team:{tie_id}:{which}")
 
 
