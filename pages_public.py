@@ -1,3 +1,5 @@
+import html as _html
+
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -5,6 +7,27 @@ import bracket_svg
 import logic
 import state
 import ui
+
+
+def _truncate_name(name, maxlen=22):
+    """Hard-cap a team/pair name's rendered length with an ellipsis.
+
+    The monitor tiles size themselves responsively (CSS grid, flex), which
+    is necessary for the layout to adapt from a single full-width spotlight
+    card down to a 4-5-per-row mobile grid. But a raw HTML <table> with
+    `white-space:nowrap` name cells (needed so scores don't wrap awkwardly)
+    will happily force the whole table WIDER than its card to fit a long
+    department name in full, and CSS-only ellipsis truncation on table
+    cells needs `table-layout:fixed` with hand-tuned column widths — fragile
+    to get right across every card size these tiles render at. Truncating
+    the string itself in Python is a hard guarantee: the table can never be
+    forced wider than intended by name length, at any screen size, without
+    depending on any particular CSS layout mode holding up.
+    Escaped via html.escape since these strings go straight into raw HTML."""
+    name = name or ""
+    if len(name) > maxlen:
+        name = name[: maxlen - 1].rstrip() + "…"
+    return _html.escape(name)
 
 
 def render_overview():
@@ -171,7 +194,7 @@ def _bd_score_table_html(tie, current_ci, compact=True, show_names=False, show_t
         if show_names:
             cells += (
                 f'<td class="bd-name-cell" style="padding:{cell_pad};font-size:{name_size};font-weight:800;color:{color};'
-                f'white-space:nowrap;text-align:left">{name}</td>'
+                f'white-space:nowrap;text-align:left">{_truncate_name(name)}</td>'
             )
         for c in cats_info:
             if not c["games"]:
@@ -210,7 +233,7 @@ def _bd_score_table_html(tie, current_ci, compact=True, show_names=False, show_t
 
 def _bd_mon_tile_html(tie, big=False):
     status = _bd_tie_status(tie)
-    t1, t2 = tie["t1"] or "TBD", tie["t2"] or "TBD"
+    t1, t2 = _truncate_name(tie["t1"] or "TBD"), _truncate_name(tie["t2"] or "TBD")
     w1, w2 = tie["w1"] or 0, tie["w2"] or 0
     border = "1px solid #f59e0b" if status == "live" else ("1px solid #2a2a24" if status != "done" else "1px solid #2f4f3a")
     badge = ('<span style="background:#f59e0b;color:#111;font-size:9px;font-weight:800;padding:2px 6px;'
@@ -307,7 +330,7 @@ def _bd_mon_tile_html(tie, big=False):
         """
         cat_table = _bd_score_table_html(tie, current_ci, compact=False, show_names=True, show_tally=True)
         return f"""
-        <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px">
+        <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px;max-width:100%;overflow-x:auto">
           {header_row}
           {cat_table}
           {activity_banner}
@@ -315,7 +338,7 @@ def _bd_mon_tile_html(tie, big=False):
         """
 
     return f"""
-    <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px">
+    <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px;max-width:100%;overflow-x:auto">
       {header_and_teams}
       {cat_strip}
     </div>
@@ -325,8 +348,30 @@ def _bd_mon_tile_html(tie, big=False):
 def _render_bd_monitor_html(bd, rounds):
     live = [t for t in bd["ties"].values() if _bd_tie_status(t) == "live" and t["id"].split("_")[0] in rounds]
     if live:
-        tiles = "".join(f'<div style="flex:1;min-width:260px">{_bd_mon_tile_html(t, big=True)}</div>' for t in live)
-        live_section = f'<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px">{tiles}</div>'
+        # Only spotlight-treat a SINGLE live tie as a full-width "big" jumbo
+        # card (wide table, huge fonts) — that layout assumes one card gets
+        # the whole row. With several ties live at once (common once WB and
+        # LB rounds run in parallel), forcing every one of them into that
+        # same wide layout then squeezing them into a flex row was the bug:
+        # each card shrank to ~260px, far narrower than the big table needs,
+        # so team names overflowed the card's edge and most of the score
+        # columns were clipped off-screen — exactly the "names not in the
+        # box" / "only shows one game" symptoms. With 2+ simultaneous live
+        # ties, fall back to the compact tile (smaller fonts, same full
+        # per-game breakdown) sized for a multi-column grid instead.
+        # CSS grid with auto-fit/minmax also replaces the old flex+min-width
+        # row: grid computes column count from the ACTUAL rendered
+        # container width, so it can't produce the same overflow-past-the-
+        # viewport squeeze flexbox did on narrow/mobile widths.
+        if len(live) == 1:
+            tiles = f'<div style="width:100%;max-width:520px">{_bd_mon_tile_html(live[0], big=True)}</div>'
+            live_section = f'<div style="margin-bottom:22px">{tiles}</div>'
+        else:
+            tiles = "".join(_bd_mon_tile_html(t) for t in live)
+            live_section = (
+                '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));'
+                f'gap:12px;margin-bottom:22px">{tiles}</div>'
+            )
     else:
         live_section = '<div style="color:#8a877d;font-size:13px;margin-bottom:22px">No matches currently in progress.</div>'
 
@@ -354,6 +399,7 @@ def _render_bd_monitor_html(bd, rounds):
     # look needs everything bigger and centered, which inline styles alone
     # can't be overridden by without !important.
     return f"""
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <div style="color-scheme:dark;background:#111110;padding:20px;border-radius:12px;font-family:'Inter',sans-serif;min-height:850px">
       <div id="bd-live-now">
         <div class="bd-fs-topbar" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px">
@@ -578,7 +624,7 @@ def _pk_score_table_html(d, compact=True, show_names=False, show_tally=False):
         if show_names:
             cells += (
                 f'<td class="pk-name-cell" style="padding:{cell_pad};font-size:{name_size};font-weight:800;color:{color};'
-                f'white-space:nowrap;text-align:left">{name}</td>'
+                f'white-space:nowrap;text-align:left">{_truncate_name(name)}</td>'
             )
         for idx, (gi, g) in enumerate(games):
             border = "border-left:1px solid #2a2a24;" if idx == 0 else ""
@@ -611,7 +657,7 @@ def _pk_score_table_html(d, compact=True, show_names=False, show_tally=False):
 
 def _pk_mon_tile_html(d, big=False):
     status = _pk_status(d)
-    t1, t2 = d["t1"] or "TBD", d["t2"] or "TBD"
+    t1, t2 = _truncate_name(d["t1"] or "TBD"), _truncate_name(d["t2"] or "TBD")
     w1, w2 = _pk_tally(d["games"])
     border = "1px solid #f59e0b" if status == "live" else ("1px solid #2a2a24" if status != "done" else "1px solid #2f4f3a")
     badge = ('<span style="background:#f59e0b;color:#111;font-size:9px;font-weight:800;padding:2px 6px;'
@@ -687,7 +733,7 @@ def _pk_mon_tile_html(d, big=False):
         """
         table = _pk_score_table_html(d, compact=False, show_names=True, show_tally=True)
         return f"""
-        <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px">
+        <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px;max-width:100%;overflow-x:auto">
           {header_row}
           {table}
           {activity_banner}
@@ -695,7 +741,7 @@ def _pk_mon_tile_html(d, big=False):
         """
 
     return f"""
-    <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px">
+    <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px;max-width:100%;overflow-x:auto">
       {header_and_teams}
       {strip}
     </div>
@@ -756,8 +802,22 @@ def _render_pk_monitor_html(pk, rounds):
             live.append(d)
 
     if live:
-        tiles = "".join(f'<div style="flex:1;min-width:260px">{_pk_mon_tile_html(d, big=True)}</div>' for d in live)
-        live_section = f'<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px">{tiles}</div>'
+        # Same fix as the badminton monitor: only spotlight a single live
+        # match as a full "big" jumbo card. Pickleball's group stage
+        # routinely has several matches live at once across 4 groups — with
+        # the old code every one of them was forced into the wide "big"
+        # layout, then squeezed into a flex row, causing team names to
+        # overflow each card's edge and the score table to get clipped so
+        # only a sliver (often just the last game's column) stayed visible.
+        if len(live) == 1:
+            tiles = f'<div style="width:100%;max-width:520px">{_pk_mon_tile_html(live[0], big=True)}</div>'
+            live_section = f'<div style="margin-bottom:22px">{tiles}</div>'
+        else:
+            tiles = "".join(_pk_mon_tile_html(d) for d in live)
+            live_section = (
+                '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));'
+                f'gap:12px;margin-bottom:22px">{tiles}</div>'
+            )
     else:
         live_section = '<div style="color:#8a877d;font-size:13px;margin-bottom:22px">No matches currently in progress.</div>'
 
@@ -793,6 +853,7 @@ def _render_pk_monitor_html(pk, rounds):
         """
 
     return f"""
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <div style="color-scheme:dark;background:#111110;padding:20px;border-radius:12px;font-family:'Inter',sans-serif;min-height:850px">
       <div id="pk-live-now">
         <div class="pk-fs-topbar" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px">
