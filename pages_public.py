@@ -369,7 +369,7 @@ def _render_bd_monitor_html(bd, rounds):
         else:
             tiles = "".join(_bd_mon_tile_html(t) for t in live)
             live_section = (
-                '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));'
+                '<div class="bd-fs-multi" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));'
                 f'gap:12px;margin-bottom:22px">{tiles}</div>'
             )
     else:
@@ -495,6 +495,7 @@ def _render_bd_monitor_html(bd, rounds):
         padding: 48px 64px !important;
         background: radial-gradient(circle at 50% 10%, #1c1a14 0%, #0a0a08 65%) !important;
         box-sizing: border-box !important;
+        overflow-y: auto !important;
       }}
       #bd-live-now.bd-fs .bd-fs-topbar {{ margin-bottom: 0 !important; }}
       #bd-live-now.bd-fs .bd-fs-legend {{ font-size: 13px !important; }}
@@ -518,6 +519,30 @@ def _render_bd_monitor_html(bd, rounds):
       #bd-live-now.bd-fs [style*="min-width:200px"] {{
         border-radius: 18px !important; padding: 32px 36px !important;
         box-shadow: 0 20px 60px rgba(0,0,0,.55) !important;
+      }}
+      /* The jumbo sizing above assumes ONE full-width spotlight card — that
+         was the only case that existed when this fullscreen mode was first
+         built. Once several ties are live simultaneously we switch to a
+         multi-column grid of compact tiles instead (see _render_bd_monitor_html),
+         and without this override those same 34px/40px font sizes and huge
+         32px/36px padding got forced onto every one of those much narrower
+         tiles too — the numbers dwarfed their cards and only a handful fit
+         per row before wrapping awkwardly. These higher-specificity rules
+         (scoped under .bd-fs-multi) win the cascade over the general rules
+         above and give the multi-tile grid its own, much more modest sizing
+         instead of inheriting single-card jumbo sizing wholesale. */
+      #bd-live-now.bd-fs .bd-fs-multi {{
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+      }}
+      #bd-live-now.bd-fs .bd-fs-multi table th {{
+        font-size: 14px !important; padding: 6px 10px !important;
+      }}
+      #bd-live-now.bd-fs .bd-fs-multi table td {{
+        font-size: 20px !important; padding: 8px 12px !important;
+      }}
+      #bd-live-now.bd-fs .bd-fs-multi [style*="min-width:200px"] {{
+        border-radius: 10px !important; padding: 16px !important;
+        box-shadow: 0 8px 24px rgba(0,0,0,.4) !important;
       }}
       #bd-live-now:fullscreen {{ background: #0a0a08; }}
       #bd-live-now:-webkit-full-screen {{ background: #0a0a08; }}
@@ -831,7 +856,7 @@ def _render_pk_monitor_html(pk, rounds):
         else:
             tiles = "".join(_pk_mon_tile_html(d) for d in live)
             live_section = (
-                '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));'
+                '<div class="pk-fs-multi" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));'
                 f'gap:12px;margin-bottom:22px">{tiles}</div>'
             )
     else:
@@ -954,6 +979,7 @@ def _render_pk_monitor_html(pk, rounds):
         padding: 48px 64px !important;
         background: radial-gradient(circle at 50% 10%, #1c1a14 0%, #0a0a08 65%) !important;
         box-sizing: border-box !important;
+        overflow-y: auto !important;
       }}
       #pk-live-now.pk-fs .pk-fs-topbar {{ margin-bottom: 0 !important; }}
       #pk-live-now.pk-fs .pk-fs-legend {{ font-size: 13px !important; }}
@@ -976,6 +1002,26 @@ def _render_pk_monitor_html(pk, rounds):
       #pk-live-now.pk-fs [style*="min-width:200px"] {{
         border-radius: 18px !important; padding: 32px 36px !important;
         box-shadow: 0 20px 60px rgba(0,0,0,.55) !important;
+      }}
+      /* Same fix as the badminton monitor: the jumbo sizing above assumes
+         ONE full-width spotlight card. With several matches live at once
+         we switch to a multi-column grid of compact tiles instead, and
+         these higher-specificity overrides (scoped under .pk-fs-multi)
+         give that grid its own modest sizing instead of inheriting the
+         single-card jumbo fonts/padding, which was dwarfing every tile's
+         numbers and only leaving room for a couple of columns per row. */
+      #pk-live-now.pk-fs .pk-fs-multi {{
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+      }}
+      #pk-live-now.pk-fs .pk-fs-multi table th {{
+        font-size: 14px !important; padding: 6px 10px !important;
+      }}
+      #pk-live-now.pk-fs .pk-fs-multi table td {{
+        font-size: 20px !important; padding: 8px 12px !important;
+      }}
+      #pk-live-now.pk-fs .pk-fs-multi [style*="min-width:200px"] {{
+        border-radius: 10px !important; padding: 16px !important;
+        box-shadow: 0 8px 24px rgba(0,0,0,.4) !important;
       }}
       #pk-live-now:fullscreen {{ background: #0a0a08; }}
       #pk-live-now:-webkit-full-screen {{ background: #0a0a08; }}
