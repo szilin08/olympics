@@ -162,17 +162,17 @@ def _bd_score_table_html(tie, current_ci, compact=True, show_names=False, show_t
     name_size = "11px" if compact else "16px"
 
     t1, t2 = tie["t1"] or "TBD", tie["t2"] or "TBD"
-    t1_color = "#4ade80" if tie["winner"] == 1 else ("#6b6960" if tie["winner"] == 2 else "#e8e6df")
-    t2_color = "#60a5fa" if tie["winner"] == 2 else ("#6b6960" if tie["winner"] == 1 else "#e8e6df")
+    t1_color = "#f5c518" if tie["winner"] == 1 else ("#6b6960" if tie["winner"] == 2 else "#e8e6df")
+    t2_color = "#ea580c" if tie["winner"] == 2 else ("#6b6960" if tie["winner"] == 1 else "#e8e6df")
 
     name_hdr = f'<th style="padding:{cell_pad}"></th>' if show_names else ""
     hdr_cells = name_hdr
     for c in cats_info:
         n = max(len(c["games"]), 1)
         if c["winner"] == 1:
-            color = "#4ade80"
+            color = "#f5c518"
         elif c["winner"] == 2:
-            color = "#60a5fa"
+            color = "#ea580c"
         elif c["ci"] == current_ci:
             color = "#f59e0b"
         else:
@@ -238,9 +238,9 @@ def _bd_mon_tile_html(tie, big=False):
     border = "1px solid #f59e0b" if status == "live" else ("1px solid #2a2a24" if status != "done" else "1px solid #2f4f3a")
     badge = ('<span style="background:#f59e0b;color:#111;font-size:9px;font-weight:800;padding:2px 6px;'
              'border-radius:3px;letter-spacing:.03em">● LIVE</span>') if status == "live" else (
-             '<span style="color:#4ade80;font-size:10px;font-weight:700">✓ FINAL</span>' if status == "done" else "")
-    t1_color = "#4ade80" if (status == "done" and tie["winner"] == 1) else ("#6b6960" if (status == "done" and tie["winner"] == 2) else "#e8e6df")
-    t2_color = "#4ade80" if (status == "done" and tie["winner"] == 2) else ("#6b6960" if (status == "done" and tie["winner"] == 1) else "#e8e6df")
+             '<span style="color:#f5c518;font-size:10px;font-weight:700">✓ FINAL</span>' if status == "done" else "")
+    t1_color = "#f5c518" if (status == "done" and tie["winner"] == 1) else ("#6b6960" if (status == "done" and tie["winner"] == 2) else "#e8e6df")
+    t2_color = "#f5c518" if (status == "done" and tie["winner"] == 2) else ("#6b6960" if (status == "done" and tie["winner"] == 1) else "#e8e6df")
     t1_weight = "700" if not (status == "done" and tie["winner"] == 2) else "400"
     t2_weight = "700" if not (status == "done" and tie["winner"] == 1) else "400"
     pad = "14px" if big else "10px"
@@ -418,8 +418,8 @@ def _render_bd_monitor_html(bd, rounds):
                         letter-spacing:.1em;text-transform:uppercase;margin-left:10px">LBS × MGB — Sports Tournament</span>
           </div>
           <div style="display:flex;gap:14px;font-size:9.5px;color:#8a877d;font-family:'DM Mono',monospace;align-items:center">
-            <span class="bd-fs-legend"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#4ade80;margin-right:4px"></span>Team A won cat.</span>
-            <span class="bd-fs-legend"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#60a5fa;margin-right:4px"></span>Team B won cat.</span>
+            <span class="bd-fs-legend"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#f5c518;margin-right:4px"></span>Team A won cat.</span>
+            <span class="bd-fs-legend"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ea580c;margin-right:4px"></span>Team B won cat.</span>
             <span class="bd-fs-legend"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#f59e0b;margin-right:4px"></span>Live now</span>
             <span class="bd-fs-legend"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#3a3a34;margin-right:4px"></span>Not started</span>
             <button id="bd-fs-btn" onclick="bdToggleFullscreen()" style="background:rgba(255,255,255,.06);
@@ -605,8 +605,8 @@ def _pk_score_table_html(d, compact=True, show_names=False, show_tally=False):
 
     t1name, t2name = d["t1"] or "TBD", d["t2"] or "TBD"
     winner = d["winner"]
-    t1_color = "#4ade80" if winner == 1 else ("#6b6960" if winner == 2 else "#e8e6df")
-    t2_color = "#60a5fa" if winner == 2 else ("#6b6960" if winner == 1 else "#e8e6df")
+    t1_color = "#f5c518" if winner == 1 else ("#6b6960" if winner == 2 else "#e8e6df")
+    t2_color = "#ea580c" if winner == 2 else ("#6b6960" if winner == 1 else "#e8e6df")
 
     current_gi = None
     if winner is None:
@@ -618,7 +618,7 @@ def _pk_score_table_html(d, compact=True, show_names=False, show_tally=False):
     hdr_cells = name_hdr
     for gi, g in games:
         if g["finished"]:
-            color = "#4ade80" if g["p1"] > g["p2"] else ("#60a5fa" if g["p2"] > g["p1"] else "#8a877d")
+            color = "#f5c518" if g["p1"] > g["p2"] else ("#ea580c" if g["p2"] > g["p1"] else "#8a877d")
         elif gi == current_gi:
             color = "#f59e0b"
         else:
@@ -678,9 +678,9 @@ def _pk_mon_tile_html(d, big=False):
     border = "1px solid #f59e0b" if status == "live" else ("1px solid #2a2a24" if status != "done" else "1px solid #2f4f3a")
     badge = ('<span style="background:#f59e0b;color:#111;font-size:9px;font-weight:800;padding:2px 6px;'
              'border-radius:3px;letter-spacing:.03em">● LIVE</span>') if status == "live" else (
-             '<span style="color:#4ade80;font-size:10px;font-weight:700">✓ FINAL</span>' if status == "done" else "")
-    t1_color = "#4ade80" if (status == "done" and d["winner"] == 1) else ("#6b6960" if (status == "done" and d["winner"] == 2) else "#e8e6df")
-    t2_color = "#4ade80" if (status == "done" and d["winner"] == 2) else ("#6b6960" if (status == "done" and d["winner"] == 1) else "#e8e6df")
+             '<span style="color:#f5c518;font-size:10px;font-weight:700">✓ FINAL</span>' if status == "done" else "")
+    t1_color = "#f5c518" if (status == "done" and d["winner"] == 1) else ("#6b6960" if (status == "done" and d["winner"] == 2) else "#e8e6df")
+    t2_color = "#f5c518" if (status == "done" and d["winner"] == 2) else ("#6b6960" if (status == "done" and d["winner"] == 1) else "#e8e6df")
     t1_weight = "700" if not (status == "done" and d["winner"] == 2) else "400"
     t2_weight = "700" if not (status == "done" and d["winner"] == 1) else "400"
     pad = "14px" if big else "10px"
@@ -771,7 +771,7 @@ def _pk_group_standings_html(pk):
         rows = ""
         for r, s in enumerate(standings):
             name = s["name"] or f"Pair {s['idx']+1}"
-            color = "#4ade80" if r < 4 else "#8a877d"
+            color = "#f5c518" if r < 4 else "#8a877d"
             weight = "700" if r < 4 else "400"
             rows += f"""
             <tr>
@@ -880,8 +880,8 @@ def _render_pk_monitor_html(pk, rounds):
                         letter-spacing:.1em;text-transform:uppercase;margin-left:10px">LBS × MGB — Sports Tournament</span>
           </div>
           <div style="display:flex;gap:14px;font-size:9.5px;color:#8a877d;font-family:'DM Mono',monospace;align-items:center">
-            <span class="pk-fs-legend"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#4ade80;margin-right:4px"></span>Pair A won game</span>
-            <span class="pk-fs-legend"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#60a5fa;margin-right:4px"></span>Pair B won game</span>
+            <span class="pk-fs-legend"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#f5c518;margin-right:4px"></span>Pair A won game</span>
+            <span class="pk-fs-legend"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ea580c;margin-right:4px"></span>Pair B won game</span>
             <span class="pk-fs-legend"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#f59e0b;margin-right:4px"></span>Live now</span>
             <span class="pk-fs-legend"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#3a3a34;margin-right:4px"></span>Not started</span>
             <button id="pk-fs-btn" onclick="pkToggleFullscreen()" style="background:rgba(255,255,255,.06);
