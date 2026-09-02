@@ -156,9 +156,9 @@ def _bd_score_table_html(tie, current_ci, compact=True, show_names=False, show_t
     if not cats_info:
         return ""
 
-    hdr_size = "9px" if compact else "13px"
-    cell_size = "11px" if compact else "20px"
-    cell_pad = "3px 7px" if compact else "10px 16px"
+    hdr_size = "8.5px" if compact else "13px"
+    cell_size = "10.5px" if compact else "20px"
+    cell_pad = "3px 5px" if compact else "10px 16px"
     name_size = "11px" if compact else "16px"
 
     t1, t2 = tie["t1"] or "TBD", tie["t2"] or "TBD"
@@ -330,7 +330,7 @@ def _bd_mon_tile_html(tie, big=False):
         """
         cat_table = _bd_score_table_html(tie, current_ci, compact=False, show_names=True, show_tally=True)
         return f"""
-        <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px;max-width:100%;overflow-x:auto">
+        <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px;max-width:100%;overflow-x:auto" class="mon-tile-card">
           {header_row}
           {cat_table}
           {activity_banner}
@@ -338,7 +338,7 @@ def _bd_mon_tile_html(tie, big=False):
         """
 
     return f"""
-    <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px;max-width:100%;overflow-x:auto">
+    <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px;max-width:100%;overflow-x:auto" class="mon-tile-card">
       {header_and_teams}
       {cat_strip}
     </div>
@@ -382,12 +382,20 @@ def _render_bd_monitor_html(bd, rounds):
         ties = [t for tid, t in bd["ties"].items() if tid.split("_")[0] == r]
         if not ties:
             continue
-        tiles = "".join(f'<div style="width:230px">{_bd_mon_tile_html(t)}</div>' for t in ties)
+        # CSS grid instead of a fixed 230px flex tile: badminton's compact
+        # score table can need up to 5 category columns (vs. pickleball's
+        # max 3 game columns), so a hard 230px was routinely too narrow and
+        # fell back to the horizontal-scrollbar safety net on nearly every
+        # card — which looked cluttered/inconsistent next to pickleball's
+        # tiles, which almost never needed to scroll. minmax(260px,...)
+        # gives the wider table breathing room; auto-fit still collapses to
+        # a single column on mobile, same as the "Live Now" grid above.
+        tiles = "".join(_bd_mon_tile_html(t) for t in ties)
         sections += f"""
         <div style="margin-bottom:20px">
           <div style="font-size:11px;color:#8a877d;text-transform:uppercase;letter-spacing:.08em;
                       font-family:'DM Mono',monospace;margin-bottom:10px">{logic.BD_ROUND_INFO[r]["label"]}</div>
-          <div style="display:flex;gap:12px;flex-wrap:wrap">{tiles}</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">{tiles}</div>
         </div>
         """
 
@@ -513,6 +521,14 @@ def _render_bd_monitor_html(bd, rounds):
       }}
       #bd-live-now:fullscreen {{ background: #0a0a08; }}
       #bd-live-now:-webkit-full-screen {{ background: #0a0a08; }}
+      /* Themed scrollbar fallback: the compact category table only needs
+         to scroll in rare edge cases now (5 categories + an in-progress
+         tie-breaker, all at once), but when it does, a slim dark scrollbar
+         blends into the card instead of a jarring default OS scrollbar. */
+      .mon-tile-card {{ scrollbar-width: thin; scrollbar-color: #3a3a34 transparent; }}
+      .mon-tile-card::-webkit-scrollbar {{ height: 4px; }}
+      .mon-tile-card::-webkit-scrollbar-track {{ background: transparent; }}
+      .mon-tile-card::-webkit-scrollbar-thumb {{ background: #3a3a34; border-radius: 4px; }}
     </style>
     """
 
@@ -733,7 +749,7 @@ def _pk_mon_tile_html(d, big=False):
         """
         table = _pk_score_table_html(d, compact=False, show_names=True, show_tally=True)
         return f"""
-        <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px;max-width:100%;overflow-x:auto">
+        <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px;max-width:100%;overflow-x:auto" class="mon-tile-card">
           {header_row}
           {table}
           {activity_banner}
@@ -741,7 +757,7 @@ def _pk_mon_tile_html(d, big=False):
         """
 
     return f"""
-    <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px;max-width:100%;overflow-x:auto">
+    <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px;max-width:100%;overflow-x:auto" class="mon-tile-card">
       {header_and_teams}
       {strip}
     </div>
@@ -843,12 +859,12 @@ def _render_pk_monitor_html(pk, rounds):
             tie = pk["ko"][tid]
             d = _pk_display(tie["t1"], tie["t2"], tie["winner"], tie["games"],
                              bracket_svg.PK_MATCH_LABELS.get(tid, tid))
-            tiles += f'<div style="width:230px">{_pk_mon_tile_html(d)}</div>'
+            tiles += _pk_mon_tile_html(d)
         sections += f"""
         <div style="margin-bottom:20px">
           <div style="font-size:11px;color:#8a877d;text-transform:uppercase;letter-spacing:.08em;
                       font-family:'DM Mono',monospace;margin-bottom:10px">{logic.PK_ROUND_LABELS[r]}</div>
-          <div style="display:flex;gap:12px;flex-wrap:wrap">{tiles}</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px">{tiles}</div>
         </div>
         """
 
@@ -963,6 +979,10 @@ def _render_pk_monitor_html(pk, rounds):
       }}
       #pk-live-now:fullscreen {{ background: #0a0a08; }}
       #pk-live-now:-webkit-full-screen {{ background: #0a0a08; }}
+      .mon-tile-card {{ scrollbar-width: thin; scrollbar-color: #3a3a34 transparent; }}
+      .mon-tile-card::-webkit-scrollbar {{ height: 4px; }}
+      .mon-tile-card::-webkit-scrollbar-track {{ background: transparent; }}
+      .mon-tile-card::-webkit-scrollbar-thumb {{ background: #3a3a34; border-radius: 4px; }}
     </style>
     """
 
