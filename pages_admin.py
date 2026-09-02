@@ -33,6 +33,12 @@ def _bd_point_cb(tie_id, ci, gi, who, delta):
     state.save_bd(bd, actor=st.session_state.get("admin_name", "admin"), action=f"point:{tie_id}")
 
 
+def _bd_score_set_cb(tie_id, ci, gi, who, key):
+    bd = state.load_bd()
+    logic.bd_set_point(bd, tie_id, ci, gi, who, st.session_state[key])
+    state.save_bd(bd, actor=st.session_state.get("admin_name", "admin"), action=f"set_score:{tie_id}")
+
+
 def _bd_finish_cb(tie_id, ci, gi):
     bd = state.load_bd()
     logic.bd_finish_game(bd, tie_id, ci, gi)
@@ -233,9 +239,11 @@ def _render_bd_tie_editor(tid, tie, pts):
                 f"Game {gi + 1}", g,
                 on_minus=(partial(_bd_point_cb, tid, ci, gi, 1, -1), partial(_bd_point_cb, tid, ci, gi, 2, -1)),
                 on_plus=(partial(_bd_point_cb, tid, ci, gi, 1, 1), partial(_bd_point_cb, tid, ci, gi, 2, 1)),
+                on_set=(partial(_bd_score_set_cb, tid, ci, gi, 1), partial(_bd_score_set_cb, tid, ci, gi, 2)),
                 on_finish=partial(_bd_finish_cb, tid, ci, gi),
                 on_reopen=partial(_bd_reopen_cb, tid, ci, gi),
                 pts_target=pts, key_prefix=key_prefix,
+                t1_name=tie["t1"] or "Team A", t2_name=tie["t2"] or "Team B",
             )
 
     st.button("↺ Reset this tie", key=f"bd_{tid}_reset", on_click=partial(_bd_reset_tie_cb, tid))
@@ -267,6 +275,12 @@ def _pk_point_cb(grp, i, j, gi, who, delta):
     state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action=f"point:{grp}")
 
 
+def _pk_score_set_cb(grp, i, j, gi, who, key):
+    pk = state.load_pk()
+    logic.pk_set_point(pk, grp, i, j, gi, who, st.session_state[key])
+    state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action=f"set_score:{grp}")
+
+
 def _pk_finish_cb(grp, i, j, gi):
     pk = state.load_pk()
     logic.pk_finish_game(pk, grp, i, j, gi)
@@ -295,6 +309,12 @@ def _pk_ko_point_cb(tid, gi, who, delta):
     pk = state.load_pk()
     logic.pk_ko_point(pk, tid, gi, who, delta)
     state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action=f"ko_point:{tid}")
+
+
+def _pk_ko_score_set_cb(tid, gi, who, key):
+    pk = state.load_pk()
+    logic.pk_ko_set_point(pk, tid, gi, who, st.session_state[key])
+    state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action=f"ko_set_score:{tid}")
 
 
 def _pk_ko_finish_cb(tid, gi):
@@ -389,9 +409,11 @@ def render_pickleball_admin():
                             f"Game {gi + 1}", g,
                             on_minus=(partial(_pk_point_cb, grp, i, j, gi, 1, -1), partial(_pk_point_cb, grp, i, j, gi, 2, -1)),
                             on_plus=(partial(_pk_point_cb, grp, i, j, gi, 1, 1), partial(_pk_point_cb, grp, i, j, gi, 2, 1)),
+                            on_set=(partial(_pk_score_set_cb, grp, i, j, gi, 1), partial(_pk_score_set_cb, grp, i, j, gi, 2)),
                             on_finish=partial(_pk_finish_cb, grp, i, j, gi),
                             on_reopen=partial(_pk_reopen_cb, grp, i, j, gi),
                             pts_target=PK_PTS, key_prefix=key_prefix,
+                            t1_name=t1, t2_name=t2,
                         )
         # persist any match dicts created on-the-fly by pk_get_match
         state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action="touch_matches")
@@ -420,9 +442,11 @@ def render_pickleball_admin():
                             f"Game {gi + 1}", g,
                             on_minus=(partial(_pk_ko_point_cb, tid, gi, 1, -1), partial(_pk_ko_point_cb, tid, gi, 2, -1)),
                             on_plus=(partial(_pk_ko_point_cb, tid, gi, 1, 1), partial(_pk_ko_point_cb, tid, gi, 2, 1)),
+                            on_set=(partial(_pk_ko_score_set_cb, tid, gi, 1), partial(_pk_ko_score_set_cb, tid, gi, 2)),
                             on_finish=partial(_pk_ko_finish_cb, tid, gi),
                             on_reopen=partial(_pk_ko_reopen_cb, tid, gi),
                             pts_target=PK_PTS, key_prefix=key_prefix,
+                            t1_name=tie["t1"] or "Pair A", t2_name=tie["t2"] or "Pair B",
                         )
                     st.button("↺ Reset this match", key=f"pkko_{tid}_reset", on_click=partial(_pk_ko_reset_tie_cb, tid))
 
