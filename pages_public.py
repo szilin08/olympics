@@ -530,9 +530,21 @@ def _render_bd_monitor_html(bd, rounds):
          per row before wrapping awkwardly. These higher-specificity rules
          (scoped under .bd-fs-multi) win the cascade over the general rules
          above and give the multi-tile grid its own, much more modest sizing
-         instead of inheriting single-card jumbo sizing wholesale. */
+         instead of inheriting single-card jumbo sizing wholesale.
+
+         Fixed column COUNT, not a minmax minimum: an actual fullscreen
+         display (real monitor/TV, via the Fullscreen API) can be far wider
+         than a normal browser window — 2500px+ isn't unusual — and a
+         minmax(300px,1fr) minimum only forces a wrap once there's no
+         longer room for another 300px column. On a wide enough screen, 7
+         or 8 tiles can still all fit on one row shoulder-to-shoulder at
+         300px+ each, which is exactly what was still happening. A fixed
+         `repeat(4, 1fr)` guarantees at most 4 tiles per row no matter how
+         wide the actual display is — the 5th tile always wraps to a new
+         row instead of the grid just adding a 5th column when there's
+         space for one. */
       #bd-live-now.bd-fs .bd-fs-multi {{
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+        grid-template-columns: repeat(4, 1fr) !important;
       }}
       #bd-live-now.bd-fs .bd-fs-multi table th {{
         font-size: 14px !important; padding: 6px 10px !important;
@@ -1009,9 +1021,17 @@ def _render_pk_monitor_html(pk, rounds):
          these higher-specificity overrides (scoped under .pk-fs-multi)
          give that grid its own modest sizing instead of inheriting the
          single-card jumbo fonts/padding, which was dwarfing every tile's
-         numbers and only leaving room for a couple of columns per row. */
+         numbers and only leaving room for a couple of columns per row.
+
+         Fixed column COUNT rather than a minmax minimum: a real fullscreen
+         display can be wide enough (2500px+) that even a 300px-per-column
+         minimum still lets 7-8 tiles all fit on a single row — which is
+         exactly what was still happening. `repeat(4, 1fr)` guarantees at
+         most 4 tiles per row on any screen size; a 5th tile always wraps
+         to a new row instead of the grid adding a 5th column whenever
+         there happens to be room for one. */
       #pk-live-now.pk-fs .pk-fs-multi {{
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+        grid-template-columns: repeat(4, 1fr) !important;
       }}
       #pk-live-now.pk-fs .pk-fs-multi table th {{
         font-size: 14px !important; padding: 6px 10px !important;
