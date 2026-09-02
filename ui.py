@@ -126,22 +126,28 @@ def score_row(label, g, on_minus, on_plus, on_finish, on_reopen, pts_target, key
     """Render one game's score row.
 
     Layout note (mobile fix): team name + score are grouped into ONE block
-    per team — a caption, then that team's -/number/+ controls right below
-    it — instead of the old single wide row of 9 skinny columns (label, -,
-    score, +, "vs", -, score, +, finish). On a phone, Streamlit stacks
-    columns that don't fit side-by-side; with the old layout that meant an
-    umpire scrolling saw a bare column of numbers and +/- buttons with the
-    "vs" separator and team identity scrolled out of view. Grouping keeps
-    "<team name>  [-] 15 [+]" together as one unit no matter how narrow the
-    screen is or how the columns reflow.
+    per team — a caption, then that team's number box right below it —
+    instead of the old single wide row of 9 skinny columns (label, -, score,
+    +, "vs", -, score, +, finish). On a phone, Streamlit stacks columns that
+    don't fit side-by-side; with the old layout that meant an umpire
+    scrolling saw a bare column of numbers and buttons with the "vs"
+    separator and team identity scrolled out of view. Grouping keeps
+    "<team name>  [15]" together as one unit no matter how narrow the screen
+    is or how the columns reflow.
+
+    When on_set is given, the score is a single st.number_input per team —
+    it already ships its own built-in -/+ steppers fused to the box, so a
+    second, separate pair of big -/+ buttons next to it was pure clutter
+    (that's what the earlier version had, and the extra +/- turned out to
+    be redundant next to the number box's own stepper). on_minus/on_plus are
+    only used as a fallback when on_set isn't provided.
 
     on_minus / on_plus: (callable, callable) no-arg callbacks for the -1/+1
-    buttons (bound via functools.partial), same as before.
-    on_set: optional (callable, callable) callbacks for typing a score
-    directly into a number box instead of tapping +/- repeatedly. Each is
-    called as callback(number_input_key) — i.e. bind the fixed args with
-    functools.partial and the session_state key of the changed widget is
-    appended automatically by Streamlit's `args=`.
+    fallback buttons (bound via functools.partial).
+    on_set: optional (callable, callable) callbacks for typing/stepping a
+    score directly in a number box. Each is called as callback(number_input_key)
+    — i.e. bind the fixed args with functools.partial and the session_state
+    key of the changed widget is appended automatically by Streamlit's `args=`.
     t1_name / t2_name: display names shown above each team's score so it's
     always clear whose points are whose, even once columns stack.
     """
@@ -171,24 +177,24 @@ def score_row(label, g, on_minus, on_plus, on_finish, on_reopen, pts_target, key
                 unsafe_allow_html=True,
             )
             if editable and not locked:
-                b1, b2, b3 = st.columns([1, 1.6, 1])
-                b1.button("–", key=f"{key_prefix}_m{who}", on_click=minus_cb, use_container_width=True)
                 if set_cb is not None:
                     # Key includes the current value so the widget always
-                    # refreshes to match state after +/- taps too — Streamlit
-                    # otherwise keeps showing whatever the user last typed.
+                    # refreshes to match state — needed in case the score
+                    # is ever changed by anything other than this same box.
                     num_key = f"{key_prefix}_num{who}_{val}"
-                    b2.number_input(
+                    st.number_input(
                         name, value=val, min_value=0, step=1, key=num_key,
                         on_change=set_cb, args=(num_key,), label_visibility="collapsed",
                     )
                 else:
+                    b1, b2, b3 = st.columns([1, 1.6, 1])
+                    b1.button("–", key=f"{key_prefix}_m{who}", on_click=minus_cb, use_container_width=True)
                     b2.markdown(
                         f"<div style='text-align:center;font-family:monospace;font-size:20px;"
                         f"font-weight:800'>{val}</div>",
                         unsafe_allow_html=True,
                     )
-                b3.button("+", key=f"{key_prefix}_p{who}", on_click=plus_cb, use_container_width=True)
+                    b3.button("+", key=f"{key_prefix}_p{who}", on_click=plus_cb, use_container_width=True)
             else:
                 st.markdown(
                     f"<div style='text-align:center;font-family:monospace;font-size:20px;"
