@@ -313,13 +313,28 @@ def inject_css():
            text on a white box was the invisible/washed-out dropdown text
            seen in light mode. Pin these controls' backgrounds to the same
            fixed dark tone as the rest of the dialog so they're legible in
-           both modes. */
+           both modes.
+
+           Also pin `color` explicitly here, not just background: the
+           page-wide rule above (`.stSelectbox [data-baseweb="select"] {{
+           color: INK !important }}`) is MORE specific (two class/attribute
+           selectors) than the blanket `:is(p, span, div, ...)` text-color
+           rule a few lines up (one attribute selector + a low-specificity
+           :is() of plain elements) — so in light mode, where INK is dark
+           brown, that page-wide rule was silently winning the cascade and
+           overriding the light ink back to dark-on-dark, even though the
+           background here was already fixed dark. This is why the bug
+           only showed up in light mode: in dark mode INK is already
+           near-white, so the wrong rule winning didn't visibly matter. */
         [data-testid="stDialog"] .stTextInput input,
         [data-testid="stDialog"] .stNumberInput input,
         [data-testid="stDialog"] .stSelectbox [data-baseweb="select"],
         [data-testid="stDialog"] .stSelectbox [data-baseweb="select"] > div,
-        [data-testid="stDialog"] .stMultiSelect [data-baseweb="select"] {{
+        [data-testid="stDialog"] .stSelectbox [data-baseweb="select"] *,
+        [data-testid="stDialog"] .stMultiSelect [data-baseweb="select"],
+        [data-testid="stDialog"] .stMultiSelect [data-baseweb="select"] * {{
             background: #0a1120 !important;
+            color: #e8eaf0 !important;
             border-color: rgba(255,255,255,.18) !important;
         }}
         [data-testid="stDialog"] .stTextInput input::placeholder {{
