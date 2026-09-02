@@ -188,6 +188,19 @@ def bd_point(bd, tie_id, ci, gi, who, delta):
     g[key] = max(0, g[key] + delta)
 
 
+def bd_set_point(bd, tie_id, ci, gi, who, value):
+    """Set a game's score to an absolute value (typed directly into a number
+    box) rather than nudging it by +/-1 — same finished-game guard as bd_point."""
+    g = bd["ties"][tie_id]["cats"][ci]["games"][gi]
+    if g["finished"]:
+        return
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return
+    g[f"p{who}"] = max(0, value)
+
+
 def bd_finish_game(bd, tie_id, ci, gi):
     g = bd["ties"][tie_id]["cats"][ci]["games"][gi]
     if g["p1"] == g["p2"]:
@@ -367,6 +380,18 @@ def pk_point(pk, grp, i, j, gi, who, delta):
     g[key] = max(0, g[key] + delta)
 
 
+def pk_set_point(pk, grp, i, j, gi, who, value):
+    m = pk_get_match(pk, grp, i, j)
+    g = m["games"][gi]
+    if g["finished"]:
+        return
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return
+    g[f"p{who}"] = max(0, value)
+
+
 def pk_finish_game(pk, grp, i, j, gi):
     m = pk_get_match(pk, grp, i, j)
     g = m["games"][gi]
@@ -471,6 +496,17 @@ def pk_ko_point(pk, tie_id, gi, who, delta):
         return
     key = f"p{who}"
     g[key] = max(0, g[key] + delta)
+
+
+def pk_ko_set_point(pk, tie_id, gi, who, value):
+    g = pk["ko"][tie_id]["games"][gi]
+    if g["finished"]:
+        return
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return
+    g[f"p{who}"] = max(0, value)
 
 
 def pk_ko_finish_game(pk, tie_id, gi):
