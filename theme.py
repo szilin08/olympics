@@ -306,14 +306,14 @@ def inject_css():
         /* Same root cause as the selectbox dropdown popover above, but for
            the input/select CONTROLS themselves (the "Team A" / "Team B"
            combobox, number inputs): the rule right above this one forces
-           every bit of text inside the dialog to light ink (#e8eaf0) so it
-           reads on the dialog's fixed dark card — but it doesn't touch the
-           control's own background, which in light mode still comes from
-           the page-wide `.stSelectbox [data-baseweb="select"] { background:
-           {{CARD}} }` rule (white in light mode). Light text on a white box
-           was the invisible/washed-out dropdown text seen in light mode.
-           Pin these controls' backgrounds to the same fixed dark tone as
-           the rest of the dialog so they're legible in both modes. */
+           every bit of text inside the dialog to light ink so it reads on
+           the dialog's fixed dark card — but it doesn't touch the control's
+           own background, which in light mode still comes from the
+           page-wide selectbox background rule (white in light mode). Light
+           text on a white box was the invisible/washed-out dropdown text
+           seen in light mode. Pin these controls' backgrounds to the same
+           fixed dark tone as the rest of the dialog so they're legible in
+           both modes. */
         [data-testid="stDialog"] .stTextInput input,
         [data-testid="stDialog"] .stNumberInput input,
         [data-testid="stDialog"] .stSelectbox [data-baseweb="select"],
