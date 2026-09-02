@@ -98,6 +98,14 @@ def dept_combobox(label, value, key, on_change, args, placeholder="Dept / Team")
 
 
 def status_badge(text, kind="ok"):
+    """Note the `!important` on background/color: this badge is also used
+    inside the st.dialog scoring modal, which pins ALL text inside it to a
+    fixed light color (via a `!important` CSS rule in theme.py) so the
+    dialog's fixed-dark card stays legible regardless of light/dark mode.
+    Without `!important` here, that page-wide rule would win over this
+    inline style and turn the badge into near-white text on a near-white
+    background — which is exactly what made the "Winner: ..." pill
+    unreadable in light mode."""
     colors = {
         "ok": ("#f0fdf4", "#15803d", "#bbf7d0"),
         "warn": ("#fffbeb", "#b45309", "#fde68a"),
@@ -107,54 +115,86 @@ def status_badge(text, kind="ok"):
     bg, fg, bd = colors.get(kind, colors["neutral"])
     st.markdown(
         f"<span style='display:inline-block;padding:2px 9px;border-radius:5px;font-size:12px;"
-        f"font-weight:600;font-family:monospace;background:{bg};color:{fg};border:1px solid {bd}'>{text}</span>",
+        f"font-weight:600;font-family:monospace;background:{bg} !important;color:{fg} !important;"
+        f"border:1px solid {bd}'>{text}</span>",
         unsafe_allow_html=True,
     )
 
 
-def score_row(label, g, on_minus, on_plus, on_finish, on_reopen, pts_target, key_prefix, editable=True):
-    """Render one game's score row with +/- and finish/reopen controls.
-    on_* are no-arg callables (already bound via functools.partial) used as Streamlit on_click callbacks.
+def score_row(label, g, on_minus, on_plus, on_finish, on_reopen, pts_target, key_prefix,
+              editable=True, on_set=None, t1_name=None, t2_name=None):
+    """Render one game's score row.
+
+    Layout note (mobile fix): team name + score are grouped into ONE block
+    per team — a caption, then that team's -/number/+ controls right below
+    it — instead of the old single wide row of 9 skinny columns (label, -,
+    score, +, "vs", -, score, +, finish). On a phone, Streamlit stacks
+    columns that don't fit side-by-side; with the old layout that meant an
+    umpire scrolling saw a bare column of numbers and +/- buttons with the
+    "vs" separator and team identity scrolled out of view. Grouping keeps
+    "<team name>  [-] 15 [+]" together as one unit no matter how narrow the
+    screen is or how the columns reflow.
+
+    on_minus / on_plus: (callable, callable) no-arg callbacks for the -1/+1
+    buttons (bound via functools.partial), same as before.
+    on_set: optional (callable, callable) callbacks for typing a score
+    directly into a number box instead of tapping +/- repeatedly. Each is
+    called as callback(number_input_key) — i.e. bind the fixed args with
+    functools.partial and the session_state key of the changed widget is
+    appended automatically by Streamlit's `args=`.
+    t1_name / t2_name: display names shown above each team's score so it's
+    always clear whose points are whose, even once columns stack.
     """
     locked = g["finished"]
-    cols = st.columns([1.1, 0.6, 0.8, 0.6, 0.4, 0.6, 0.8, 0.6, 1.6])
-    cols[0].markdown(f"**{label}**")
-    if editable and not locked:
-        cols[1].button("–", key=f"{key_prefix}_m1", on_click=on_minus[0], use_container_width=True)
-    else:
-        cols[1].write("")
-    cols[2].markdown(
-        f"<div style='text-align:center;font-family:monospace;font-size:18px;font-weight:800'>{g['p1']}</div>",
-        unsafe_allow_html=True,
-    )
-    if editable and not locked:
-        cols[3].button("+", key=f"{key_prefix}_p1", on_click=on_plus[0], use_container_width=True)
-    else:
-        cols[3].write("")
-    cols[4].markdown("<div style='text-align:center;color:#a8a59e'>vs</div>", unsafe_allow_html=True)
-    if editable and not locked:
-        cols[5].button("–", key=f"{key_prefix}_m2", on_click=on_minus[1], use_container_width=True)
-    else:
-        cols[5].write("")
-    cols[6].markdown(
-        f"<div style='text-align:center;font-family:monospace;font-size:18px;font-weight:800'>{g['p2']}</div>",
-        unsafe_allow_html=True,
-    )
-    if editable and not locked:
-        cols[7].button("+", key=f"{key_prefix}_p2", on_click=on_plus[1], use_container_width=True)
-    else:
-        cols[7].write("")
+    name1 = t1_name or "Team A"
+    name2 = t2_name or "Team B"
 
-    if not editable:
-        cols[8].write("")
-        return
+    top_l, top_r = st.columns([3, 1])
+    top_l.markdown(f"**{label}**")
+    if editable:
+        can_finish = (not locked) and (g["p1"] != g["p2"]) and (g["p1"] >= pts_target or g["p2"] >= pts_target)
+        if locked:
+            top_r.button("↺ Reopen", key=f"{key_prefix}_reopen", on_click=on_reopen, use_container_width=True)
+        else:
+            top_r.button("Finish ✓", key=f"{key_prefix}_finish", on_click=on_finish,
+                          disabled=not can_finish, use_container_width=True)
 
-    can_finish = (not locked) and (g["p1"] != g["p2"]) and (g["p1"] >= pts_target or g["p2"] >= pts_target)
-    if locked:
-        cols[8].button("↺ Reopen", key=f"{key_prefix}_reopen", on_click=on_reopen, use_container_width=True)
-    else:
-        cols[8].button("Finish ✓", key=f"{key_prefix}_finish", on_click=on_finish,
-                        disabled=not can_finish, use_container_width=True)
+    c1, c2 = st.columns(2)
+    for col, who, name, val, minus_cb, plus_cb, set_cb in (
+        (c1, 1, name1, g["p1"], on_minus[0], on_plus[0], on_set[0] if on_set else None),
+        (c2, 2, name2, g["p2"], on_minus[1], on_plus[1], on_set[1] if on_set else None),
+    ):
+        with col:
+            st.markdown(
+                f"<div style='font-size:12px;font-weight:700;opacity:.8;margin-bottom:2px;"
+                f"overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>{name}</div>",
+                unsafe_allow_html=True,
+            )
+            if editable and not locked:
+                b1, b2, b3 = st.columns([1, 1.6, 1])
+                b1.button("–", key=f"{key_prefix}_m{who}", on_click=minus_cb, use_container_width=True)
+                if set_cb is not None:
+                    # Key includes the current value so the widget always
+                    # refreshes to match state after +/- taps too — Streamlit
+                    # otherwise keeps showing whatever the user last typed.
+                    num_key = f"{key_prefix}_num{who}_{val}"
+                    b2.number_input(
+                        name, value=val, min_value=0, step=1, key=num_key,
+                        on_change=set_cb, args=(num_key,), label_visibility="collapsed",
+                    )
+                else:
+                    b2.markdown(
+                        f"<div style='text-align:center;font-family:monospace;font-size:20px;"
+                        f"font-weight:800'>{val}</div>",
+                        unsafe_allow_html=True,
+                    )
+                b3.button("+", key=f"{key_prefix}_p{who}", on_click=plus_cb, use_container_width=True)
+            else:
+                st.markdown(
+                    f"<div style='text-align:center;font-family:monospace;font-size:20px;"
+                    f"font-weight:800'>{val}</div>",
+                    unsafe_allow_html=True,
+                )
 
 
 def team_vs_line(t1, t2, winner=None):
