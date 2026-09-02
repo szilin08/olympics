@@ -249,11 +249,28 @@ def inject_css():
         }}
         .stButton button:hover {{ border-color: {GOLD}; color: {GOLD_DK}; }}
 
-        /* ── INPUTS ── */
-        .stTextInput input, .stNumberInput input, .stSelectbox [data-baseweb="select"], .stMultiSelect [data-baseweb="select"] {{
+        /* ── INPUTS ──
+           Streamlit has shipped at least two completely different internal
+           implementations of st.selectbox: an older one built on BaseWeb
+           (DOM: `[data-baseweb="select"]`), and a newer one (confirmed via
+           live DOM inspection) built on react-aria, where the visible box
+           is a `[role="group"]` wrapping a plain `<input role="combobox">`,
+           and the options popup portals to `[role="listbox"]`/`[role="option"]`
+           instead of `[data-testid="stSelectboxVirtualDropdown"]`. Since
+           requirements.txt pins `streamlit>=1.38` with no upper bound,
+           Streamlit Cloud can silently install a newer version whose
+           widget markup doesn't match whichever selector this file was
+           last written against — every rule below is therefore duplicated
+           for BOTH shapes so styling survives a Streamlit upgrade instead
+           of silently going dead again. */
+        .stTextInput input, .stNumberInput input,
+        .stSelectbox [data-baseweb="select"], .stMultiSelect [data-baseweb="select"],
+        .stSelectbox [role="group"], .stMultiSelect [role="group"],
+        .stSelectbox input[role="combobox"], .stMultiSelect input[role="combobox"] {{
             background: {CARD} !important; color: {INK} !important; border-color: {BORDER_2} !important;
         }}
-        .stTextInput input::placeholder {{ color: {MUTED} !important; }}
+        .stTextInput input::placeholder,
+        .stSelectbox input[role="combobox"]::placeholder {{ color: {MUTED} !important; }}
 
         /* selectbox dropdown popover (Team A / Team B dept picker) — this
            overlay always renders with a fixed dark-navy background no
@@ -262,20 +279,27 @@ def inject_css():
            following the page's global `p, span, div, label {{ color: INK }}`
            rule above, which flips to a dark brown in light mode — dark text
            on a dark box, unreadable. Pin this popover to fixed, always-legible
-           colors instead of the theme variable so it's correct in both modes. */
-        [data-testid="stSelectboxVirtualDropdown"] {{
+           colors instead of the theme variable so it's correct in both modes.
+           `[role="listbox"]`/`[role="option"]` (unscoped/global, not nested
+           under stSelectbox) covers the react-aria version, which portals
+           the popup elsewhere in the DOM rather than nesting it under the
+           widget that opened it. */
+        [data-testid="stSelectboxVirtualDropdown"], [role="listbox"] {{
             background: #0a0e17 !important; border: 1px solid rgba(255,255,255,.16) !important;
         }}
         [data-testid="stSelectboxVirtualDropdown"] [role="option"],
-        [data-testid="stSelectboxVirtualDropdown"] [role="option"] * {{
+        [data-testid="stSelectboxVirtualDropdown"] [role="option"] *,
+        [role="listbox"] [role="option"] {{
             color: #e8eaf0 !important; background: transparent !important;
         }}
         [data-testid="stSelectboxVirtualDropdown"] [role="option"]:hover,
-        [data-testid="stSelectboxVirtualDropdown"] [role="option"][aria-selected="true"] {{
+        [data-testid="stSelectboxVirtualDropdown"] [role="option"][aria-selected="true"],
+        [role="listbox"] [role="option"]:hover, [role="listbox"] [role="option"][aria-selected="true"] {{
             background: rgba(217,154,43,.20) !important;
         }}
         [data-testid="stSelectboxVirtualDropdown"] [role="option"]:hover *,
-        [data-testid="stSelectboxVirtualDropdown"] [role="option"][aria-selected="true"] * {{
+        [data-testid="stSelectboxVirtualDropdown"] [role="option"][aria-selected="true"] *,
+        [role="listbox"] [role="option"]:hover *, [role="listbox"] [role="option"][aria-selected="true"] * {{
             color: #f0c874 !important;
         }}
 
@@ -316,31 +340,45 @@ def inject_css():
            both modes.
 
            Also pin `color` explicitly here, not just background: the
-           page-wide rule above (`.stSelectbox [data-baseweb="select"] {{
-           color: INK !important }}`) is MORE specific (two class/attribute
-           selectors) than the blanket `:is(p, span, div, ...)` text-color
-           rule a few lines up (one attribute selector + a low-specificity
-           :is() of plain elements) — so in light mode, where INK is dark
-           brown, that page-wide rule was silently winning the cascade and
-           overriding the light ink back to dark-on-dark, even though the
-           background here was already fixed dark. This is why the bug
-           only showed up in light mode: in dark mode INK is already
-           near-white, so the wrong rule winning didn't visibly matter. */
+           page-wide rule above (`... {{ color: INK !important }}`) is MORE
+           specific (two class/attribute selectors) than the blanket
+           `:is(p, span, div, ...)` text-color rule a few lines up (one
+           attribute selector + a low-specificity :is() of plain elements)
+           — so in light mode, where INK is dark brown, that page-wide rule
+           was silently winning the cascade and overriding the light ink
+           back to dark-on-dark, even though the background here was
+           already fixed dark. This is why the bug only showed up in light
+           mode: in dark mode INK is already near-white, so the wrong rule
+           winning didn't visibly matter.
+
+           Covers both the legacy `[data-baseweb="select"]` DOM and the
+           current react-aria DOM (`[role="group"]` wrapper +
+           `input[role="combobox"]`) — see the big comment on "INPUTS"
+           above for why both are needed. */
         [data-testid="stDialog"] .stTextInput input,
         [data-testid="stDialog"] .stNumberInput input,
         [data-testid="stDialog"] .stSelectbox [data-baseweb="select"],
         [data-testid="stDialog"] .stSelectbox [data-baseweb="select"] > div,
         [data-testid="stDialog"] .stSelectbox [data-baseweb="select"] *,
         [data-testid="stDialog"] .stMultiSelect [data-baseweb="select"],
-        [data-testid="stDialog"] .stMultiSelect [data-baseweb="select"] * {{
+        [data-testid="stDialog"] .stMultiSelect [data-baseweb="select"] *,
+        [data-testid="stDialog"] .stSelectbox [role="group"],
+        [data-testid="stDialog"] .stSelectbox input[role="combobox"],
+        [data-testid="stDialog"] .stMultiSelect [role="group"],
+        [data-testid="stDialog"] .stMultiSelect input[role="combobox"],
+        [data-testid="stDialog"] [data-testid="stNumberInputContainer"],
+        [data-testid="stDialog"] input[data-testid="stNumberInputField"] {{
             background: #0a1120 !important;
             color: #e8eaf0 !important;
             border-color: rgba(255,255,255,.18) !important;
         }}
-        [data-testid="stDialog"] .stTextInput input::placeholder {{
+        [data-testid="stDialog"] .stTextInput input::placeholder,
+        [data-testid="stDialog"] .stSelectbox input[role="combobox"]::placeholder {{
             color: #8b93a6 !important;
         }}
-        [data-testid="stDialog"] .stNumberInput button {{
+        [data-testid="stDialog"] .stNumberInput button,
+        [data-testid="stDialog"] button[data-testid="stNumberInputStepUp"],
+        [data-testid="stDialog"] button[data-testid="stNumberInputStepDown"] {{
             background: #171d2e !important; border-color: rgba(255,255,255,.18) !important;
         }}
         [data-testid="stDialog"] .stButton button {{
