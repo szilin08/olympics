@@ -1,4 +1,5 @@
 import html as _html
+import time
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -570,6 +571,58 @@ def _render_bd_monitor_html(bd, rounds):
     """
 
 
+def _live_autorefresh_control(key, default=15):
+    """Renders just the interval picker and returns the chosen value (0 =
+    off). Split from the actual sleep/rerun (see _live_autorefresh_wait
+    below) so callers can render the REST of the page's content first —
+    calling st.rerun() immediately halts the script right where it's
+    called, so if the sleep+rerun happened here, any code written after
+    this call (the round filter, the monitor HTML itself) would never
+    execute. That was the actual bug in an earlier version: the page
+    looked like it was stuck showing stale/wrong content forever, because
+    the monitor grid was never being reached before the rerun cut the
+    script off.
+    """
+    options = [10, 15, 20, 30, 0]
+    return st.selectbox(
+        "Auto-refresh", options, index=options.index(default),
+        format_func=lambda s: "Auto-refresh: Off" if s == 0 else f"Auto-refresh: every {s}s",
+        key=key, label_visibility="collapsed",
+    )
+
+
+def _live_autorefresh_wait(interval):
+    """Call this LAST, after every other bit of page content has already
+    been rendered. On event day this page gets put up on a screen and left
+    alone (no one is sitting there clicking around), so without this,
+    viewers would only ever see whatever score was on the screen the last
+    time someone happened to interact with it — Streamlit only re-renders
+    a page when a widget fires. Sleeping then calling st.rerun() forces
+    the WHOLE app script to run again every N seconds, which re-reads the
+    latest bd/pk state from the database and redraws the monitor with it,
+    so a score an umpire just entered on the admin side shows up here
+    within one interval without anyone touching this screen.
+
+    Implemented as plain time.sleep() + st.rerun() rather than pulling in
+    a separate autorefresh package: this only ever needs to support a
+    handful of projector/viewer devices with the page open at once for a
+    single-day event, so blocking each of those sessions' server thread
+    for a few seconds between reruns is cheap — and it avoids adding a new
+    dependency that could itself drift versions the way plain `streamlit`
+    already did once in this project (the selectbox DOM rewrite that broke
+    theme.py's CSS selectors). If this ever needs to scale to many more
+    simultaneous viewers, `streamlit-autorefresh` (a small community
+    component using a non-blocking JS timer instead of a server-side
+    sleep) would be the natural next step.
+    """
+    if interval:
+        st.caption(f"🔄 Refreshing every {interval}s so this stays live on the projector without anyone touching it.")
+        time.sleep(interval)
+        st.rerun()
+    else:
+        st.caption("🔄 Auto-refresh is off — reload the page manually to see new scores.")
+
+
 def render_badminton_monitor():
     ui.page_header("Home / Badminton", "Badminton — Live Monitor",
                     "16 departments · Double elimination · First to 3 category wins", "Live", "green")
@@ -583,7 +636,10 @@ def render_badminton_monitor():
         )
         st.markdown("")
 
-    view = st.radio("View", ["🗂 Bracket View", "📺 Live Monitor"], horizontal=True, label_visibility="collapsed")
+    view_col, refresh_col = st.columns([3, 1])
+    with view_col:
+        view = st.radio("View", ["🗂 Bracket View", "📺 Live Monitor"], horizontal=True,
+                         label_visibility="collapsed", key="bd_mon_view")
 
     if view == "🗂 Bracket View":
         st.caption("Solid lines route winners forward; dashed lines route losers down to the losers bracket. "
@@ -591,10 +647,13 @@ def render_badminton_monitor():
         html = bracket_svg.render_bracket_view_html(bd)
         components.html(html, height=bracket_svg.canvas_size()["h"] + 40, scrolling=True)
     else:
+        with refresh_col:
+            refresh_interval = _live_autorefresh_control("bd_mon_refresh_secs")
         rounds = st.multiselect("Show rounds", logic.ALL_BD_ROUNDS, default=logic.ALL_BD_ROUNDS,
                                  format_func=lambda r: logic.BD_ROUND_INFO[r]["label"], key="bd_mon_rounds")
         html = _render_bd_monitor_html(bd, rounds)
         components.html(html, height=900, scrolling=True)
+        _live_autorefresh_wait(refresh_interval)
 
 
 def _pk_display(t1, t2, winner, games, label):
@@ -1066,7 +1125,10 @@ def render_pickleball_monitor():
         )
         st.markdown("")
 
-    view = st.radio("View", ["🗂 Bracket View", "📺 Live Monitor"], horizontal=True, label_visibility="collapsed")
+    view_col, refresh_col = st.columns([3, 1])
+    with view_col:
+        view = st.radio("View", ["🗂 Bracket View", "📺 Live Monitor"], horizontal=True,
+                         label_visibility="collapsed", key="pk_mon_view")
 
     if view == "🗂 Bracket View":
         st.caption("Solid lines route winners forward through the Round of 16 → Quarter-Final → Semi-Final → Final. "
@@ -1074,7 +1136,10 @@ def render_pickleball_monitor():
         html = bracket_svg.render_pk_bracket_view_html(pk)
         components.html(html, height=bracket_svg.pk_canvas_size()["h"] + 40, scrolling=True)
     else:
+        with refresh_col:
+            refresh_interval = _live_autorefresh_control("pk_mon_refresh_secs")
         rounds = st.multiselect("Show rounds", logic.ALL_PK_ROUNDS, default=logic.ALL_PK_ROUNDS,
                                  format_func=lambda r: logic.PK_ROUND_LABELS[r], key="pk_mon_rounds")
         html = _render_pk_monitor_html(pk, rounds)
         components.html(html, height=900, scrolling=True)
+        _live_autorefresh_wait(refresh_interval)
