@@ -149,6 +149,58 @@ def _render_backup_restore_panel():
                     st.success("Restored. Reload the page to see it everywhere.")
 
 
+def _render_routing_repair_panel():
+    """One-time repair for brackets created before the losers-bracket
+    routing fix (the W2->L2 and W3->L4 cross-feeds used to be wired
+    backwards). bd_init() only sets a tie's wt/lt routing links the very
+    first time the bracket is created; those links are then saved into the
+    database and reused forever after, so deploying the corrected logic.py
+    on its own has NO effect on a bracket that already exists — the stale,
+    wrong links are still sitting in the already-saved ties. This panel
+    lets an admin preview exactly what would change, then apply
+    logic.bd_rebuild_routing() to fix it in place. Every score already
+    entered is preserved; only the wt/lt routing (and the LB-side team
+    placements that flow from it) is corrected.
+    Safe to delete this whole function + its call site once every
+    tournament's bracket has been repaired and re-deployed brackets will
+    be created correctly from the start."""
+    bd = state.load_bd()
+    with st.expander("🔧 Fix losers-bracket routing (one-time repair)", expanded=False):
+        st.caption(
+            "If this bracket was created before the LB routing fix, some losers-bracket ties may have "
+            "the wrong two teams in them (a routing bug, not a scoring bug). This preview shows exactly "
+            "which ties would change — every score you've already entered is preserved either way."
+        )
+        repaired = logic.bd_rebuild_routing(bd)
+        diffs = []
+        for tid, new_tie in repaired["ties"].items():
+            old_tie = bd["ties"].get(tid, {})
+            if (old_tie.get("t1", ""), old_tie.get("t2", "")) != (new_tie["t1"], new_tie["t2"]):
+                diffs.append((tid, old_tie.get("t1", ""), old_tie.get("t2", ""), new_tie["t1"], new_tie["t2"]))
+
+        if not diffs:
+            st.success("✅ No routing differences found — this bracket already matches the corrected topology.")
+            return
+
+        st.warning(f"⚠️ {len(diffs)} tie(s) would change:")
+        st.dataframe(
+            [{"Tie": tid, "Before — Team A": b1 or "—", "Before — Team B": b2 or "—",
+              "After — Team A": a1 or "—", "After — Team B": a2 or "—"}
+             for tid, b1, b2, a1, a2 in diffs],
+            hide_index=True, use_container_width=True,
+        )
+        st.caption(
+            "Applying this will re-derive every losers-bracket tie's teams from the fixed routing. "
+            "If any of the affected ties already have scores entered against the WRONG team pairing "
+            "shown above, clear those specific games first (or re-enter them after applying) since the "
+            "score numbers themselves are kept but the teams they're attached to may need re-checking."
+        )
+        if st.button("✅ Apply routing repair", type="primary", key="bd_apply_routing_repair"):
+            state.save_bd(repaired, actor=st.session_state.get("admin_name", "admin"), action="repair_routing")
+            st.success("Routing repaired. Reloading…")
+            st.rerun()
+
+
 def render_badminton_admin():
     auth.require_admin()
     ui.page_header("Home / Badminton", "Badminton — Admin",
@@ -156,6 +208,7 @@ def render_badminton_admin():
                     "Admin mode", "navy")
 
     _render_backup_restore_panel()
+    _render_routing_repair_panel()
 
     bd = state.load_bd()
 
