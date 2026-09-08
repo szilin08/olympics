@@ -13,6 +13,16 @@ def load_bd():
     if not bd or not bd.get("ties"):
         bd = logic.bd_init()
         db.set_state(BD_KEY, bd, actor="system", action="init")
+        return bd
+    # Self-heal: a bracket created before the losers-bracket routing fix has
+    # the old (wrong) wt/lt links baked into its saved ties forever, since
+    # bd_init() only runs once at creation — deploying corrected logic.py by
+    # itself has no effect on a bracket that already exists in the database.
+    # Checking (and repairing) on every load means the fix takes effect the
+    # moment this file is deployed, with no admin action required.
+    if logic.bd_needs_routing_repair(bd):
+        bd = logic.bd_rebuild_routing(bd)
+        db.set_state(BD_KEY, bd, actor="system", action="auto_repair_routing")
     return bd
 
 
