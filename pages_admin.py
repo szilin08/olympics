@@ -150,26 +150,19 @@ def _render_backup_restore_panel():
 
 
 def _render_routing_repair_panel():
-    """One-time repair for brackets created before the losers-bracket
-    routing fix (the W2->L2 and W3->L4 cross-feeds used to be wired
-    backwards). bd_init() only sets a tie's wt/lt routing links the very
-    first time the bracket is created; those links are then saved into the
-    database and reused forever after, so deploying the corrected logic.py
-    on its own has NO effect on a bracket that already exists — the stale,
-    wrong links are still sitting in the already-saved ties. This panel
-    lets an admin preview exactly what would change, then apply
-    logic.bd_rebuild_routing() to fix it in place. Every score already
-    entered is preserved; only the wt/lt routing (and the LB-side team
-    placements that flow from it) is corrected.
-    Safe to delete this whole function + its call site once every
-    tournament's bracket has been repaired and re-deployed brackets will
-    be created correctly from the start."""
-    bd = state.load_bd()
-    with st.expander("🔧 Fix losers-bracket routing (one-time repair)", expanded=False):
+    """Manual fallback for the losers-bracket routing fix. state.load_bd()
+    now auto-heals stale routing on every load (see its docstring), so this
+    panel should normally report "already up to date" — it's kept as a
+    visible confirmation and as a manual trigger in case load_bd()'s
+    auto-heal hasn't run yet for some reason (e.g. this admin page is
+    opened before any other page loaded the bracket this session).
+    Safe to delete once you're confident every deployment includes the
+    auto-heal in state.py."""
+    bd = state.load_bd()  # auto-heals as a side effect of this call
+    with st.expander("🔧 Losers-bracket routing check", expanded=False):
         st.caption(
-            "If this bracket was created before the LB routing fix, some losers-bracket ties may have "
-            "the wrong two teams in them (a routing bug, not a scoring bug). This preview shows exactly "
-            "which ties would change — every score you've already entered is preserved either way."
+            "The app now auto-repairs stale losers-bracket routing every time the bracket loads, so this "
+            "should always show 'already up to date.' This panel is a manual fallback/confirmation only."
         )
         repaired = logic.bd_rebuild_routing(bd)
         diffs = []
