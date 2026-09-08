@@ -15,12 +15,7 @@ def _render_game(gi, g, key_prefix, on_minus, on_plus, on_set, on_finish, on_reo
                   pts_target, t1_name, t2_name):
     """Render one game's score_row, collapsing it into a one-line summary
     once it's finished so umpires scrolling a long tie/match only have to
-    look at (and scroll past) the games that are still open. This mirrors
-    the outer per-match st.expander already used elsewhere, but at the
-    per-game level, which matters for badminton ties (5 categories x up to
-    3 games shown flat, no outer expander at all) and for best-of-3
-    pickleball matches where game 1 can be long finished while game 2/3
-    are still live.
+    look at (and scroll past) the games that are still open.
 
     A closed game shows "Game N · 15-8 · Team A" so the umpire can confirm
     the result at a glance without opening it; an open game renders in
@@ -37,6 +32,18 @@ def _render_game(gi, g, key_prefix, on_minus, on_plus, on_set, on_finish, on_reo
         ui.score_row(label, g, on_minus=on_minus, on_plus=on_plus, on_set=on_set,
                      on_finish=on_finish, on_reopen=on_reopen, pts_target=pts_target,
                      key_prefix=key_prefix, t1_name=t1_name, t2_name=t2_name)
+
+
+def _render_game_plain(gi, g, key_prefix, on_minus, on_plus, on_set, on_finish, on_reopen,
+                        pts_target, t1_name, t2_name):
+    """Same as _render_game but never wraps in its own expander — used
+    inside a badminton category that's already collapsed as a whole (see
+    _render_bd_tie_editor), so a finished game doesn't get double-nested
+    inside two expanders (category expander > game expander) with nothing
+    left to show at the outer level but another fold."""
+    ui.score_row(f"Game {gi + 1}", g, on_minus=on_minus, on_plus=on_plus, on_set=on_set,
+                 on_finish=on_finish, on_reopen=on_reopen, pts_target=pts_target,
+                 key_prefix=key_prefix, t1_name=t1_name, t2_name=t2_name)
 
 
 # ───────────────────────── badminton callbacks ─────────────────────────
@@ -259,20 +266,40 @@ def _render_bd_tie_editor(tid, tie, pts):
         is_tb = ci == 4
         if is_tb and not (tie["tbNeeded"] or any(g["finished"] for g in cat["games"])):
             continue
-        st.markdown(f"**{catname}**")
-        for gi in logic.visible_games(cat["games"]):
-            g = cat["games"][gi]
-            key_prefix = f"bd_{tid}_{ci}_{gi}"
-            _render_game(
-                gi, g, key_prefix,
-                on_minus=(partial(_bd_point_cb, tid, ci, gi, 1, -1), partial(_bd_point_cb, tid, ci, gi, 2, -1)),
-                on_plus=(partial(_bd_point_cb, tid, ci, gi, 1, 1), partial(_bd_point_cb, tid, ci, gi, 2, 1)),
-                on_set=(partial(_bd_score_set_cb, tid, ci, gi, 1), partial(_bd_score_set_cb, tid, ci, gi, 2)),
-                on_finish=partial(_bd_finish_cb, tid, ci, gi),
-                on_reopen=partial(_bd_reopen_cb, tid, ci, gi),
-                pts_target=pts,
-                t1_name=tie["t1"] or "Team A", t2_name=tie["t2"] or "Team B",
-            )
+
+        t1_name, t2_name = tie["t1"] or "Team A", tie["t2"] or "Team B"
+        cat_winner = logic.bd_cat_winner(cat)
+
+        def _games(render_fn):
+            for gi in logic.visible_games(cat["games"]):
+                g = cat["games"][gi]
+                key_prefix = f"bd_{tid}_{ci}_{gi}"
+                render_fn(
+                    gi, g, key_prefix,
+                    on_minus=(partial(_bd_point_cb, tid, ci, gi, 1, -1), partial(_bd_point_cb, tid, ci, gi, 2, -1)),
+                    on_plus=(partial(_bd_point_cb, tid, ci, gi, 1, 1), partial(_bd_point_cb, tid, ci, gi, 2, 1)),
+                    on_set=(partial(_bd_score_set_cb, tid, ci, gi, 1), partial(_bd_score_set_cb, tid, ci, gi, 2)),
+                    on_finish=partial(_bd_finish_cb, tid, ci, gi),
+                    on_reopen=partial(_bd_reopen_cb, tid, ci, gi),
+                    pts_target=pts, t1_name=t1_name, t2_name=t2_name,
+                )
+
+        if cat_winner:
+            # Whole category decided (best-of-3 won 2-0 or 2-1) — collapse
+            # it down to one line so a finished tie's 5 categories don't
+            # each spell out 2-3 rows the umpire never needs to touch again.
+            winner_name = t1_name if cat_winner == 1 else t2_name
+            wins1 = sum(1 for g in cat["games"] if g["finished"] and g["p1"] > g["p2"])
+            wins2 = sum(1 for g in cat["games"] if g["finished"] and g["p2"] > g["p1"])
+            summary = f"✅ {catname} — {winner_name} won {wins1}–{wins2}"
+            with st.expander(summary, expanded=False):
+                _games(_render_game_plain)
+        else:
+            # Still live: show the category name, then only the games that
+            # still need attention get their own space — any already-
+            # finished game (e.g. 1-1 with game 3 in progress) collapses.
+            st.markdown(f"**{catname}**")
+            _games(_render_game)
 
     st.button("↺ Reset this tie", key=f"bd_{tid}_reset", on_click=partial(_bd_reset_tie_cb, tid))
 
