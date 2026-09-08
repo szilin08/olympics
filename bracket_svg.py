@@ -174,8 +174,8 @@ def _draw_lines():
         s += (f'<path d="M{x1},{y1} C{x1+40},{y1} {x2-40},{y2} {x2},{y2}" '
               f'stroke="{D}" stroke-width="1.5" stroke-dasharray="5,4" fill="none" opacity="0.7"/>')
 
-    drop("W2_0", "L2_3"); drop("W2_1", "L2_2"); drop("W2_2", "L2_1"); drop("W2_3", "L2_0")
-    drop("W3_0", "L4_1"); drop("W3_1", "L4_0")
+    drop("W2_0", "L2_0"); drop("W2_1", "L2_1"); drop("W2_2", "L2_2"); drop("W2_3", "L2_3")
+    drop("W3_0", "L4_0"); drop("W3_1", "L4_1")
     drop("W4_0", "L6_0")
     return s
 
