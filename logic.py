@@ -80,6 +80,29 @@ def bd_init():
     return {"ties": ties, "open": {}}
 
 
+def bd_needs_routing_repair(bd):
+    """True if bd's saved ties still carry the pre-fix losers-bracket
+    routing links. wt/ws/lt/ls are pure topology — set once at creation and
+    never touched by scoring — so comparing them against a fresh, correctly
+    -routed bd_init() skeleton tells us with certainty whether this
+    particular bracket was created before the routing fix, regardless of
+    what's actually been played so far. Used to auto-heal on every load
+    (see state.load_bd) rather than depending on an admin remembering to
+    run the manual repair panel."""
+    if not bd or not bd.get("ties"):
+        return False
+    fresh = bd_init()
+    for tid, fresh_tie in fresh["ties"].items():
+        tie = bd["ties"].get(tid)
+        if not tie:
+            return True
+        if (tie.get("wt"), tie.get("ws"), tie.get("lt"), tie.get("ls")) != (
+            fresh_tie["wt"], fresh_tie["ws"], fresh_tie["lt"], fresh_tie["ls"],
+        ):
+            return True
+    return False
+
+
 def bd_rebuild_routing(old_bd):
     """One-time repair for brackets created before the losers-bracket
     routing fix (the W2->L2 and W3->L4 cross-feeds used to be wired
