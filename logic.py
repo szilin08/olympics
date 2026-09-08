@@ -80,6 +80,67 @@ def bd_init():
     return {"ties": ties, "open": {}}
 
 
+def bd_rebuild_routing(old_bd):
+    """One-time repair for brackets created before the losers-bracket
+    routing fix (the W2->L2 and W3->L4 cross-feeds used to be wired
+    backwards). bd_init() only seeds a tie's wt/lt links the first time the
+    bracket is created; those links are then saved into the database and
+    reused forever after, so simply deploying corrected code has no effect
+    on a bracket that already exists — the stale, wrong links are still
+    sitting in the saved ties. This rebuilds a bracket from the CURRENT
+    (correct) topology while replaying everything the admin has actually
+    entered, so no scores are lost.
+
+    What's preserved verbatim (raw admin input, never derived):
+      - every category's game scores (cats[].games[].p1/p2/finished) for
+        every tie
+      - the two team names on each of the 8 Round-1 ties (W1_0..W1_7),
+        since those are typed/picked directly, not propagated from
+        anywhere upstream
+
+    What's recomputed fresh from the corrected topology:
+      - every other tie's t1/t2/winner/tally, by replaying bd_recompute
+        across the whole bracket in dependency order (parents before
+        children), exactly the same cascade that runs live every time an
+        admin finishes a game — so a tie's winner/loser lands in the
+        correct next tie according to the fixed wt/lt links, not the old
+        ones.
+    """
+    new_bd = bd_init()
+    old_ties = old_bd.get("ties", {})
+
+    for tid, tie in new_bd["ties"].items():
+        old_tie = old_ties.get(tid)
+        if old_tie:
+            tie["cats"] = copy.deepcopy(old_tie["cats"])
+
+    for i in range(8):
+        tid = f"W1_{i}"
+        old_tie = old_ties.get(tid)
+        if old_tie:
+            new_bd["ties"][tid]["t1"] = old_tie.get("t1", "")
+            new_bd["ties"][tid]["t2"] = old_tie.get("t2", "")
+
+    order = (
+        [f"W1_{i}" for i in range(8)]
+        + [f"L1_{i}" for i in range(4)]
+        + [f"W2_{i}" for i in range(4)]
+        + [f"L2_{i}" for i in range(4)]
+        + ["W3_0", "W3_1"]
+        + ["L3_0", "L3_1"]
+        + ["L4_0", "L4_1"]
+        + ["W4_0"]
+        + ["L5_0"]
+        + ["L6_0"]
+        + ["GF"]
+    )
+    for tid in order:
+        bd_recompute(new_bd, tid)
+
+    new_bd["open"] = old_bd.get("open", {})
+    return new_bd
+
+
 def bd_cat_winner(cat):
     w1 = w2 = 0
     for g in cat["games"]:
