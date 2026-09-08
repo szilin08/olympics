@@ -403,6 +403,33 @@ def inject_css():
         [data-testid="stExpander"] summary {{ font-weight: 600; color: {INK}; }}
         [data-testid="stExpander"] summary:hover {{ color: {GOLD_DK}; }}
 
+        /* Expanders inside the scoring dialog (finished-game / finished-
+           category summary rows) need the same fixed-dark treatment as
+           everything else in the dialog. The generic rule right above
+           this one sets the expander's background to the {CARD} variable,
+           which is WHITE in light mode; the dialog wrapper's own
+           "force dark" rule (`[data-testid="stDialog"] > div`, above)
+           only sets ITS OWN background, which doesn't cascade down to a
+           nested element's background (only text color inherits) — so
+           the expander card was rendering as a white box with faint
+           gray text and a barely-visible checkmark inside an otherwise
+           dark dialog. Pin its background, border, and summary text/icon
+           color explicitly, same fixed dark tone as the rest of the
+           dialog controls. */
+        [data-testid="stDialog"] [data-testid="stExpander"] {{
+            background: #0f1626 !important;
+            border-color: rgba(255,255,255,.16) !important;
+        }}
+        [data-testid="stDialog"] [data-testid="stExpander"] summary {{
+            color: #e8eaf0 !important;
+        }}
+        [data-testid="stDialog"] [data-testid="stExpander"] summary svg {{
+            fill: #e8eaf0 !important;
+        }}
+        [data-testid="stDialog"] [data-testid="stExpander"] summary:hover {{
+            color: {GOLD_LT} !important;
+        }}
+
         /* container(border=True) cards */
         [data-testid="stVerticalBlockBorderWrapper"] > div {{
             background: {CARD}; border-color: {BORDER} !important; border-radius: 10px;
