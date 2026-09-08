@@ -11,6 +11,34 @@ import ui
 PK_PTS = 15  # pickleball is always best-of-3 to 15, per the tournament rules
 
 
+def _render_game(gi, g, key_prefix, on_minus, on_plus, on_set, on_finish, on_reopen,
+                  pts_target, t1_name, t2_name):
+    """Render one game's score_row, collapsing it into a one-line summary
+    once it's finished so umpires scrolling a long tie/match only have to
+    look at (and scroll past) the games that are still open. This mirrors
+    the outer per-match st.expander already used elsewhere, but at the
+    per-game level, which matters for badminton ties (5 categories x up to
+    3 games shown flat, no outer expander at all) and for best-of-3
+    pickleball matches where game 1 can be long finished while game 2/3
+    are still live.
+
+    A closed game shows "Game N · 15-8 · Team A" so the umpire can confirm
+    the result at a glance without opening it; an open game renders in
+    full immediately, unfolded, so it's the thing that gets attention."""
+    label = f"Game {gi + 1}"
+    if g["finished"]:
+        winner = t1_name if g["p1"] > g["p2"] else t2_name
+        summary = f"✅ {label} · {g['p1']}–{g['p2']} · {winner}"
+        with st.expander(summary, expanded=False):
+            ui.score_row(label, g, on_minus=on_minus, on_plus=on_plus, on_set=on_set,
+                         on_finish=on_finish, on_reopen=on_reopen, pts_target=pts_target,
+                         key_prefix=key_prefix, t1_name=t1_name, t2_name=t2_name)
+    else:
+        ui.score_row(label, g, on_minus=on_minus, on_plus=on_plus, on_set=on_set,
+                     on_finish=on_finish, on_reopen=on_reopen, pts_target=pts_target,
+                     key_prefix=key_prefix, t1_name=t1_name, t2_name=t2_name)
+
+
 # ───────────────────────── badminton callbacks ─────────────────────────
 
 def _bd_team_change(tie_id, which, key):
@@ -235,14 +263,14 @@ def _render_bd_tie_editor(tid, tie, pts):
         for gi in logic.visible_games(cat["games"]):
             g = cat["games"][gi]
             key_prefix = f"bd_{tid}_{ci}_{gi}"
-            ui.score_row(
-                f"Game {gi + 1}", g,
+            _render_game(
+                gi, g, key_prefix,
                 on_minus=(partial(_bd_point_cb, tid, ci, gi, 1, -1), partial(_bd_point_cb, tid, ci, gi, 2, -1)),
                 on_plus=(partial(_bd_point_cb, tid, ci, gi, 1, 1), partial(_bd_point_cb, tid, ci, gi, 2, 1)),
                 on_set=(partial(_bd_score_set_cb, tid, ci, gi, 1), partial(_bd_score_set_cb, tid, ci, gi, 2)),
                 on_finish=partial(_bd_finish_cb, tid, ci, gi),
                 on_reopen=partial(_bd_reopen_cb, tid, ci, gi),
-                pts_target=pts, key_prefix=key_prefix,
+                pts_target=pts,
                 t1_name=tie["t1"] or "Team A", t2_name=tie["t2"] or "Team B",
             )
 
@@ -405,14 +433,14 @@ def render_pickleball_admin():
                     for gi in logic.visible_games(m["games"]):
                         g = m["games"][gi]
                         key_prefix = f"pk_{grp}_{i}_{j}_{gi}"
-                        ui.score_row(
-                            f"Game {gi + 1}", g,
+                        _render_game(
+                            gi, g, key_prefix,
                             on_minus=(partial(_pk_point_cb, grp, i, j, gi, 1, -1), partial(_pk_point_cb, grp, i, j, gi, 2, -1)),
                             on_plus=(partial(_pk_point_cb, grp, i, j, gi, 1, 1), partial(_pk_point_cb, grp, i, j, gi, 2, 1)),
                             on_set=(partial(_pk_score_set_cb, grp, i, j, gi, 1), partial(_pk_score_set_cb, grp, i, j, gi, 2)),
                             on_finish=partial(_pk_finish_cb, grp, i, j, gi),
                             on_reopen=partial(_pk_reopen_cb, grp, i, j, gi),
-                            pts_target=PK_PTS, key_prefix=key_prefix,
+                            pts_target=PK_PTS,
                             t1_name=t1, t2_name=t2,
                         )
         # persist any match dicts created on-the-fly by pk_get_match
@@ -438,14 +466,14 @@ def render_pickleball_admin():
                     for gi in logic.visible_games(tie["games"]):
                         g = tie["games"][gi]
                         key_prefix = f"pkko_{tid}_{gi}"
-                        ui.score_row(
-                            f"Game {gi + 1}", g,
+                        _render_game(
+                            gi, g, key_prefix,
                             on_minus=(partial(_pk_ko_point_cb, tid, gi, 1, -1), partial(_pk_ko_point_cb, tid, gi, 2, -1)),
                             on_plus=(partial(_pk_ko_point_cb, tid, gi, 1, 1), partial(_pk_ko_point_cb, tid, gi, 2, 1)),
                             on_set=(partial(_pk_ko_score_set_cb, tid, gi, 1), partial(_pk_ko_score_set_cb, tid, gi, 2)),
                             on_finish=partial(_pk_ko_finish_cb, tid, gi),
                             on_reopen=partial(_pk_ko_reopen_cb, tid, gi),
-                            pts_target=PK_PTS, key_prefix=key_prefix,
+                            pts_target=PK_PTS,
                             t1_name=tie["t1"] or "Pair A", t2_name=tie["t2"] or "Pair B",
                         )
                     st.button("↺ Reset this match", key=f"pkko_{tid}_reset", on_click=partial(_pk_ko_reset_tie_cb, tid))
