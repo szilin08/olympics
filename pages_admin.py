@@ -16,7 +16,6 @@ def _render_game(gi, g, key_prefix, on_minus, on_plus, on_set, on_finish, on_reo
     """Render one game's score_row, collapsing it into a one-line summary
     once it's finished so umpires scrolling a long tie/match only have to
     look at (and scroll past) the games that are still open.
-
     A closed game shows "Game N · 15-8 · Team A" so the umpire can confirm
     the result at a glance without opening it; an open game renders in
     full immediately, unfolded, so it's the thing that gets attention."""
@@ -170,11 +169,9 @@ def _render_routing_repair_panel():
             old_tie = bd["ties"].get(tid, {})
             if (old_tie.get("t1", ""), old_tie.get("t2", "")) != (new_tie["t1"], new_tie["t2"]):
                 diffs.append((tid, old_tie.get("t1", ""), old_tie.get("t2", ""), new_tie["t1"], new_tie["t2"]))
-
         if not diffs:
             st.success("✅ No routing differences found — this bracket already matches the corrected topology.")
             return
-
         st.warning(f"⚠️ {len(diffs)} tie(s) would change:")
         st.dataframe(
             [{"Tie": tid, "Before — Team A": b1 or "—", "Before — Team B": b2 or "—",
@@ -312,7 +309,6 @@ def _render_bd_tie_editor(tid, tie, pts):
         is_tb = ci == 4
         if is_tb and not (tie["tbNeeded"] or any(g["finished"] for g in cat["games"])):
             continue
-
         t1_name, t2_name = tie["t1"] or "Team A", tie["t2"] or "Team B"
         cat_winner = logic.bd_cat_winner(cat)
 
@@ -441,6 +437,8 @@ def render_pickleball_admin():
     ui.page_header("Home / Pickleball", "Pickleball — Admin",
                     "22 pairs · 4 groups · Top 4 per group advance · Mixed doubles · Best of 3 to 15 pts",
                     "Admin mode", "navy")
+
+    _render_backup_restore_panel()
 
     top1, top2 = st.columns([3, 1])
     with top2:
