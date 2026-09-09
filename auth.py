@@ -163,13 +163,11 @@ def umpire_login_widget():
         return
 
     with st.sidebar.expander("🎙️ Umpire login", expanded=False):
-        st.caption(f"Password source: **{_umpire_password_source()}**")
-        name = st.text_input("Your name (optional)", key="umpire_name_input", placeholder="e.g. Court 2 umpire")
         pw = st.text_input("Umpire password", type="password", key="umpire_pw_input")
         if st.button("Unlock umpire mode", key="unlock_umpire_btn", use_container_width=True, type="primary"):
             if _hash(pw) == _hash(_get_umpire_password()):
                 st.session_state["is_umpire"] = True
-                st.session_state["admin_name"] = name.strip() or "umpire"
+                st.session_state["admin_name"] = "umpire"
                 st.rerun()
             else:
                 st.error("Incorrect password.")
