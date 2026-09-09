@@ -74,7 +74,7 @@ def leaderboard_row(rank, name, subtitle, pills, pct, bar_color="#1a4fba", tag="
 CLEAR_OPTION = "— Clear / unassign —"
 
 
-def dept_combobox(label, value, key, on_change, args, placeholder="Dept / Team"):
+def dept_combobox(label, value, key, on_change, args, placeholder="Dept / Team", disabled=False):
     """A dropdown that also accepts free-text (Streamlit's combobox mode).
     Pre-seeds session_state so a previously-saved custom (non-roster) name still
     shows correctly even though it isn't one of the dropdown options.
@@ -86,6 +86,9 @@ def dept_combobox(label, value, key, on_change, args, placeholder="Dept / Team")
     so admins have an explicit way to unassign a team; the on_change callback
     is responsible for translating it to None before saving (see
     pages_admin._bd_team_change).
+
+    disabled: True locks the box read-only — used for umpire-role pages so
+    umpires can see who's playing but can't reassign teams.
     """
     import data
     if key not in st.session_state:
@@ -94,6 +97,7 @@ def dept_combobox(label, value, key, on_change, args, placeholder="Dept / Team")
     return st.selectbox(
         label, options=options, key=key, accept_new_options=True,
         placeholder=placeholder, on_change=on_change, args=args, label_visibility="collapsed",
+        disabled=disabled,
     )
 
 
