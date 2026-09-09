@@ -3,15 +3,11 @@ Tournament logic, ported 1:1 from the original HTML/JS build so behaviour
 matches exactly: category-based ties for badminton (double elimination,
 16 departments) and round-robin groups + single-elim knockout for
 pickleball (22 pairs, 4 groups, top 4 advance to Round of 16).
-
 All functions operate on plain dicts (JSON-serializable) so they can be
 persisted straight into SQLite via db.get_state/set_state.
 """
-
 import copy
-
 # ───────────────────────── shared ─────────────────────────
-
 BD_ROUND_INFO = {
     "W1": {"label": "WB Round 1", "pts": 15},
     "W2": {"label": "WB Quarter-Final", "pts": 15},
@@ -27,7 +23,6 @@ BD_ROUND_INFO = {
 }
 ALL_BD_ROUNDS = ["W1", "W2", "W3", "W4", "L1", "L2", "L3", "L4", "L5", "L6", "GF"]
 BD_CATS = ["Mixed Doubles 1", "Men's Doubles", "Women's Doubles", "Mixed Doubles 2", "Tie-Breaker (Any Pairing)"]
-
 ALL_PK_ROUNDS = ["GROUP", "K1", "K2", "K3", "GF"]
 PK_ROUND_LABELS = {"GROUP": "Group Stage", "K1": "Round of 16", "K2": "Quarter-Final", "K3": "Semi-Final", "GF": "Final"}
 PK_KO_ROUND_LABELS = {
@@ -36,32 +31,21 @@ PK_KO_ROUND_LABELS = {
     **{f"K3_{i}": "Semi-Final" for i in range(2)},
     "GF": "Final",
 }
-
-
 # ───────────────────────── badminton ─────────────────────────
-
 def bd_blank_game():
     return {"p1": 0, "p2": 0, "finished": False}
-
-
 def bd_blank_cat():
     return {"games": [bd_blank_game(), bd_blank_game(), bd_blank_game()]}
-
-
 def bd_blank_tie(tie_id, wt=None, ws=0, lt=None, ls=0):
     return {
         "id": tie_id, "t1": "", "t2": "", "winner": None, "w1": 0, "w2": 0, "tbNeeded": False,
         "wt": wt, "ws": ws, "lt": lt, "ls": ls,
         "cats": [bd_blank_cat() for _ in range(5)],
     }
-
-
 def bd_init():
     ties = {}
-
     def mk(tid, wt=None, ws=0, lt=None, ls=0):
         ties[tid] = bd_blank_tie(tid, wt, ws, lt, ls)
-
     mk("W1_0", "W2_0", 1, "L1_0", 1); mk("W1_1", "W2_0", 2, "L1_0", 2)
     mk("W1_2", "W2_1", 1, "L1_1", 1); mk("W1_3", "W2_1", 2, "L1_1", 2)
     mk("W1_4", "W2_2", 1, "L1_2", 1); mk("W1_5", "W2_2", 2, "L1_2", 2)
@@ -78,8 +62,6 @@ def bd_init():
     mk("L6_0", "GF", 2)
     mk("GF")
     return {"ties": ties, "open": {}}
-
-
 def bd_needs_routing_repair(bd):
     """True if bd's saved ties still carry the pre-fix losers-bracket
     routing links. wt/ws/lt/ls are pure topology — set once at creation and
@@ -101,8 +83,6 @@ def bd_needs_routing_repair(bd):
         ):
             return True
     return False
-
-
 def bd_rebuild_routing(old_bd):
     """One-time repair for brackets created before the losers-bracket
     routing fix (the W2->L2 and W3->L4 cross-feeds used to be wired
@@ -113,14 +93,12 @@ def bd_rebuild_routing(old_bd):
     sitting in the saved ties. This rebuilds a bracket from the CURRENT
     (correct) topology while replaying everything the admin has actually
     entered, so no scores are lost.
-
     What's preserved verbatim (raw admin input, never derived):
       - every category's game scores (cats[].games[].p1/p2/finished) for
         every tie
       - the two team names on each of the 8 Round-1 ties (W1_0..W1_7),
         since those are typed/picked directly, not propagated from
         anywhere upstream
-
     What's recomputed fresh from the corrected topology:
       - every other tie's t1/t2/winner/tally, by replaying bd_recompute
         across the whole bracket in dependency order (parents before
@@ -131,19 +109,16 @@ def bd_rebuild_routing(old_bd):
     """
     new_bd = bd_init()
     old_ties = old_bd.get("ties", {})
-
     for tid, tie in new_bd["ties"].items():
         old_tie = old_ties.get(tid)
         if old_tie:
             tie["cats"] = copy.deepcopy(old_tie["cats"])
-
     for i in range(8):
         tid = f"W1_{i}"
         old_tie = old_ties.get(tid)
         if old_tie:
             new_bd["ties"][tid]["t1"] = old_tie.get("t1", "")
             new_bd["ties"][tid]["t2"] = old_tie.get("t2", "")
-
     order = (
         [f"W1_{i}" for i in range(8)]
         + [f"L1_{i}" for i in range(4)]
@@ -159,11 +134,8 @@ def bd_rebuild_routing(old_bd):
     )
     for tid in order:
         bd_recompute(new_bd, tid)
-
     new_bd["open"] = old_bd.get("open", {})
     return new_bd
-
-
 def bd_cat_winner(cat):
     w1 = w2 = 0
     for g in cat["games"]:
@@ -180,8 +152,6 @@ def bd_cat_winner(cat):
     if w2 == 2:
         return 2
     return None
-
-
 def bd_tie_tally(tie):
     cw = [bd_cat_winner(c) for c in tie["cats"][:4]]
     w1 = cw.count(1)
@@ -196,8 +166,6 @@ def bd_tie_tally(tie):
             return {"winner": tb, "w1": w1 + (1 if tb == 1 else 0), "w2": w2 + (1 if tb == 2 else 0), "tbNeeded": False}
         return {"winner": None, "w1": w1, "w2": w2, "tbNeeded": True}
     return {"winner": None, "w1": w1, "w2": w2, "tbNeeded": False}
-
-
 def bd_clear_downstream(bd, tie):
     if tie.get("wt"):
         nt = bd["ties"].get(tie["wt"])
@@ -219,8 +187,6 @@ def bd_clear_downstream(bd, tie):
             if nt["winner"] is not None:
                 nt["winner"] = None
                 bd_clear_downstream(bd, nt)
-
-
 def bd_recompute(bd, tie_id):
     tie = bd["ties"].get(tie_id)
     if not tie:
@@ -262,16 +228,12 @@ def bd_recompute(bd, tie_id):
                 else:
                     nt["t2"] = ""
                 bd_clear_downstream(bd, nt)
-
-
 def bd_point(bd, tie_id, ci, gi, who, delta):
     g = bd["ties"][tie_id]["cats"][ci]["games"][gi]
     if g["finished"]:
         return
     key = f"p{who}"
     g[key] = max(0, g[key] + delta)
-
-
 def bd_set_point(bd, tie_id, ci, gi, who, value):
     """Set a game's score to an absolute value (typed directly into a number
     box) rather than nudging it by +/-1 — same finished-game guard as bd_point."""
@@ -283,32 +245,22 @@ def bd_set_point(bd, tie_id, ci, gi, who, value):
     except (TypeError, ValueError):
         return
     g[f"p{who}"] = max(0, value)
-
-
 def bd_finish_game(bd, tie_id, ci, gi):
     g = bd["ties"][tie_id]["cats"][ci]["games"][gi]
     if g["p1"] == g["p2"]:
         return
     g["finished"] = True
     bd_recompute(bd, tie_id)
-
-
 def bd_reopen_game(bd, tie_id, ci, gi):
     bd["ties"][tie_id]["cats"][ci]["games"][gi]["finished"] = False
     bd_recompute(bd, tie_id)
-
-
 def bd_set_team(bd, tie_id, which, val):
     bd["ties"][tie_id][which] = val
-
-
 def bd_reset_tie(bd, tie_id):
     tie = bd["ties"][tie_id]
     bd_clear_downstream(bd, tie)
     tie["cats"] = [bd_blank_cat() for _ in range(5)]
     tie["winner"], tie["w1"], tie["w2"], tie["tbNeeded"] = None, 0, 0, False
-
-
 def bd_visible_games(games):
     show = [0]
     if games[0]["finished"]:
@@ -319,8 +271,6 @@ def bd_visible_games(games):
         if w0 != w1:
             show.append(2)
     return show
-
-
 def bd_current_activity(tie):
     """What's actually being played right now within a tie: which category,
     which game number, and the live score — for the monitor's 'Live Now' tiles."""
@@ -341,11 +291,7 @@ def bd_current_activity(tie):
         g = cat["games"][gi]
         return {"ci": 4, "cat_name": BD_CATS[4], "game_no": gi + 1, "p1": g["p1"], "p2": g["p2"]}
     return None
-
-
 BD_CAT_ABBR = ["MD1", "MD", "WD", "MD2", "TB"]
-
-
 def bd_category_breakdown(tie):
     """Per-category status for every category in the tie, in order — used to
     render a historical strip (decided / live / not started) on monitor tiles.
@@ -358,7 +304,6 @@ def bd_category_breakdown(tie):
         if ci == 4 and not (tie["tbNeeded"] or started):
             continue  # hide the tie-breaker slot unless it's actually in play
         winner = bd_cat_winner(cat)
-
         finished_scores = [f'{g["p1"]}-{g["p2"]}' for g in cat["games"] if g["finished"]]
         current_score = None
         if winner is None:
@@ -366,35 +311,23 @@ def bd_category_breakdown(tie):
             last = cat["games"][vis[-1]]
             if not last["finished"] and (last["p1"] > 0 or last["p2"] > 0):
                 current_score = f'{last["p1"]}-{last["p2"]}'
-
         out.append({
             "ci": ci, "abbr": BD_CAT_ABBR[ci], "name": BD_CATS[ci],
             "winner": winner, "started": started,
             "finished_scores": finished_scores, "current_score": current_score,
         })
     return out
-
-
 visible_games = bd_visible_games  # alias: same best-of-3 reveal logic used by pickleball matches too
-
-
 def bd_champion(bd):
     gf = bd["ties"].get("GF")
     if gf and gf["winner"]:
         return gf["t1"] if gf["winner"] == 1 else gf["t2"]
     return None
-
-
 # ───────────────────────── pickleball ─────────────────────────
-
 def pk_blank_game():
     return {"p1": 0, "p2": 0, "finished": False}
-
-
 def pk_blank_match():
     return {"games": [pk_blank_game(), pk_blank_game(), pk_blank_game()], "winner": None}
-
-
 def pk_init_default():
     groups = {
         "A": [{"name": ""} for _ in range(6)],
@@ -405,15 +338,11 @@ def pk_init_default():
     pk = {"groups": groups, "matches": {}, "ko": {}}
     pk["ko"] = pk_init_ko()
     return pk
-
-
 def pk_init_ko():
     K = {}
-
     def mk(tid, wt=None, ws=0):
         K[tid] = {"id": tid, "t1": "", "t2": "", "wt": wt, "ws": ws, "winner": None,
                    "games": [pk_blank_game(), pk_blank_game(), pk_blank_game()]}
-
     mk("K1_0", "K2_0", 1); mk("K1_1", "K2_0", 2)
     mk("K1_2", "K2_1", 1); mk("K1_3", "K2_1", 2)
     mk("K1_4", "K2_2", 1); mk("K1_5", "K2_2", 2)
@@ -423,20 +352,14 @@ def pk_init_ko():
     mk("K3_0", "GF", 1); mk("K3_1", "GF", 2)
     mk("GF")
     return K
-
-
 def pk_get_match(pk, grp, i, j):
     pk["matches"].setdefault(grp, {})
     key = f"{i}-{j}"
     if key not in pk["matches"][grp]:
         pk["matches"][grp][key] = pk_blank_match()
     return pk["matches"][grp][key]
-
-
 def pk_get_match_if_exists(pk, grp, i, j):
     return pk["matches"].get(grp, {}).get(f"{i}-{j}")
-
-
 def pk_match_winner(m):
     w1 = w2 = 0
     for g in m["games"]:
@@ -453,8 +376,6 @@ def pk_match_winner(m):
     if w2 == 2:
         return 2
     return None
-
-
 def pk_point(pk, grp, i, j, gi, who, delta):
     m = pk_get_match(pk, grp, i, j)
     g = m["games"][gi]
@@ -462,8 +383,6 @@ def pk_point(pk, grp, i, j, gi, who, delta):
         return
     key = f"p{who}"
     g[key] = max(0, g[key] + delta)
-
-
 def pk_set_point(pk, grp, i, j, gi, who, value):
     m = pk_get_match(pk, grp, i, j)
     g = m["games"][gi]
@@ -474,8 +393,6 @@ def pk_set_point(pk, grp, i, j, gi, who, value):
     except (TypeError, ValueError):
         return
     g[f"p{who}"] = max(0, value)
-
-
 def pk_finish_game(pk, grp, i, j, gi):
     m = pk_get_match(pk, grp, i, j)
     g = m["games"][gi]
@@ -483,14 +400,10 @@ def pk_finish_game(pk, grp, i, j, gi):
         return
     g["finished"] = True
     m["winner"] = pk_match_winner(m)
-
-
 def pk_reopen_game(pk, grp, i, j, gi):
     m = pk_get_match(pk, grp, i, j)
     m["games"][gi]["finished"] = False
     m["winner"] = pk_match_winner(m)
-
-
 def pk_standings(pk, grp):
     pairs = pk["groups"][grp]
     n = len(pairs)
@@ -518,22 +431,14 @@ def pk_standings(pk, grp):
         s["diff"] = s["pf"] - s["pa"]
     stats.sort(key=lambda s: (-s["mw"], -s["gw"], -s["diff"]))
     return stats
-
-
 def pk_add_pair(pk, grp):
     if len(pk["groups"][grp]) < 10:
         pk["groups"][grp].append({"name": ""})
-
-
 def pk_remove_pair(pk, grp):
     if len(pk["groups"][grp]) > 4:
         pk["groups"][grp].pop()
-
-
 def pk_set_pair_name(pk, grp, idx, val):
     pk["groups"][grp][idx]["name"] = val
-
-
 def pk_ko_clear_downstream(pk, tie):
     if tie.get("wt"):
         nt = pk["ko"].get(tie["wt"])
@@ -545,8 +450,6 @@ def pk_ko_clear_downstream(pk, tie):
             if nt["winner"] is not None:
                 nt["winner"] = None
                 pk_ko_clear_downstream(pk, nt)
-
-
 def pk_ko_recompute(pk, tie_id):
     tie = pk["ko"].get(tie_id)
     if not tie:
@@ -572,16 +475,12 @@ def pk_ko_recompute(pk, tie_id):
                 else:
                     nt["t2"] = ""
                 pk_ko_clear_downstream(pk, nt)
-
-
 def pk_ko_point(pk, tie_id, gi, who, delta):
     g = pk["ko"][tie_id]["games"][gi]
     if g["finished"]:
         return
     key = f"p{who}"
     g[key] = max(0, g[key] + delta)
-
-
 def pk_ko_set_point(pk, tie_id, gi, who, value):
     g = pk["ko"][tie_id]["games"][gi]
     if g["finished"]:
@@ -591,39 +490,27 @@ def pk_ko_set_point(pk, tie_id, gi, who, value):
     except (TypeError, ValueError):
         return
     g[f"p{who}"] = max(0, value)
-
-
 def pk_ko_finish_game(pk, tie_id, gi):
     g = pk["ko"][tie_id]["games"][gi]
     if g["p1"] == g["p2"]:
         return
     g["finished"] = True
     pk_ko_recompute(pk, tie_id)
-
-
 def pk_ko_reopen_game(pk, tie_id, gi):
     pk["ko"][tie_id]["games"][gi]["finished"] = False
     pk_ko_recompute(pk, tie_id)
-
-
 def pk_ko_set_team(pk, tie_id, which, val):
     pk["ko"][tie_id][which] = val
-
-
 def pk_ko_reset_tie(pk, tie_id):
     tie = pk["ko"][tie_id]
     pk_ko_clear_downstream(pk, tie)
     tie["games"] = [pk_blank_game(), pk_blank_game(), pk_blank_game()]
     tie["winner"] = None
-
-
 def pk_champion(pk):
     gf = pk["ko"].get("GF")
     if gf and gf["winner"]:
         return gf["t1"] if gf["winner"] == 1 else gf["t2"]
     return None
-
-
 def pk_group_qualified(pk):
     """Returns dict grp -> list of top-4 pair names (in standings order)."""
     out = {}
@@ -631,22 +518,40 @@ def pk_group_qualified(pk):
         st = pk_standings(pk, grp)
         out[grp] = [(s["name"] or f"Pair {s['idx']+1}") for s in st[:4]]
     return out
-
-
 def pk_auto_seed_ko(pk):
-    """Auto-fill Round-of-16 slots from group standings (top 4 of each group),
-    following the same A/D vs B/C cross-seeding used in the original design."""
+    """Auto-fill all 8 Round-of-16 matches (16 slots total) from group
+    standings, top 4 of each group. Matches the published bracket:
+
+        K1_0  A1 vs D4      K1_4  B1 vs C4
+        K1_1  B2 vs C3      K1_5  A2 vs D3
+        K1_2  C1 vs B4      K1_6  D1 vs A4
+        K1_3  D2 vs A3      K1_7  C2 vs B3
+
+    K1_0+K1_1 feed K2_0, K1_2+K1_3 feed K2_1, K1_4+K1_5 feed K2_2, and
+    K1_6+K1_7 feed K2_3, so every quarter-final still pits an A/D-side
+    qualifier against a B/C-side qualifier, same as the previous scheme —
+    this version just seeds all 16 qualifiers (not only the 1st/4th-place
+    pairs) and fills both sides of every match instead of leaving half of
+    each one as TBD.
+    """
     q = pk_group_qualified(pk)
     a, b, c, d = q["A"], q["B"], q["C"], q["D"]
-    seed_pairs = [
-        ("K1_0", a[0] if len(a) > 0 else ""), ("K1_1", b[3] if len(b) > 3 else ""),
-        ("K1_2", c[0] if len(c) > 0 else ""), ("K1_3", d[3] if len(d) > 3 else ""),
-        ("K1_4", b[0] if len(b) > 0 else ""), ("K1_5", a[3] if len(a) > 3 else ""),
-        ("K1_6", d[0] if len(d) > 0 else ""), ("K1_7", c[3] if len(c) > 3 else ""),
-    ]
-    slots = {
-        "K1_0": "t1", "K1_1": "t2", "K1_2": "t1", "K1_3": "t2",
-        "K1_4": "t1", "K1_5": "t2", "K1_6": "t1", "K1_7": "t2",
+
+    def seed(lst, rank):
+        # rank is 1-based (1st, 2nd, 3rd, 4th place in the group)
+        idx = rank - 1
+        return lst[idx] if len(lst) > idx else ""
+
+    matchups = {
+        "K1_0": (seed(a, 1), seed(d, 4)),
+        "K1_1": (seed(b, 2), seed(c, 3)),
+        "K1_2": (seed(c, 1), seed(b, 4)),
+        "K1_3": (seed(d, 2), seed(a, 3)),
+        "K1_4": (seed(b, 1), seed(c, 4)),
+        "K1_5": (seed(a, 2), seed(d, 3)),
+        "K1_6": (seed(d, 1), seed(a, 4)),
+        "K1_7": (seed(c, 2), seed(b, 3)),
     }
-    for tid, name in seed_pairs:
-        pk["ko"][tid][slots[tid]] = name
+    for tid, (t1, t2) in matchups.items():
+        pk["ko"][tid]["t1"] = t1
+        pk["ko"][tid]["t2"] = t2
