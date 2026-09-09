@@ -68,6 +68,11 @@ ADMIN_PAGES = [
     ("Pickleball — Admin", "📝", pages_admin.render_pickleball_admin),
 ]
 
+UMPIRE_PAGES = [
+    ("Badminton — Umpiring", "🏸", pages_admin.render_badminton_umpire),
+    ("Pickleball — Umpiring", "🏓", pages_admin.render_pickleball_umpire),
+]
+
 
 def _nav_button(label, icon, active):
     clicked = st.button(
@@ -140,6 +145,8 @@ def main():
     available = dict((label, fn) for label, _, fn in VIEWER_PAGES)
     if auth.is_admin():
         available.update((label, fn) for label, _, fn in ADMIN_PAGES)
+    if auth.is_scorer():
+        available.update((label, fn) for label, _, fn in UMPIRE_PAGES)
 
     # Bounce back to Home if the current page no longer exists — either the
     # admin logged out while on an admin-only page, or (as with the removed
@@ -177,13 +184,19 @@ def main():
             for label, icon, _ in ADMIN_PAGES:
                 _nav_button(label, icon, st.session_state["current_page"] == label)
 
-        # ── bottom block: admin login, then the user chip with the
+        if auth.is_scorer():
+            st.markdown('<div class="nav-label">Umpiring</div>', unsafe_allow_html=True)
+            for label, icon, _ in UMPIRE_PAGES:
+                _nav_button(label, icon, st.session_state["current_page"] == label)
+
+        # ── bottom block: admin + umpire login, then the user chip with the
         # dark/light toggle sitting right beside it in a narrow column ──
         st.markdown('<hr class="sb-bottom-divider">', unsafe_allow_html=True)
         auth.login_widget()
+        auth.umpire_login_widget()
 
-        who = st.session_state.get("admin_name", "Viewer") if auth.is_admin() else "Viewer"
-        role = "Admin" if auth.is_admin() else "Viewer"
+        who = st.session_state.get("admin_name", "Viewer") if auth.is_scorer() else "Viewer"
+        role = "Admin" if auth.is_admin() else ("Umpire" if auth.is_umpire() else "Viewer")
         user_col, toggle_col = st.columns([4, 1])
         with user_col:
             st.markdown(
