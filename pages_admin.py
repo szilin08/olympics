@@ -58,37 +58,37 @@ def _bd_team_change(tie_id, which, key):
         st.session_state[key] = None
     bd = state.load_bd()
     logic.bd_set_team(bd, tie_id, which, val)
-    state.save_bd(bd, actor=st.session_state.get("admin_name", "admin"), action=f"set_team:{tie_id}:{which}")
+    state.save_bd(bd, actor=auth.actor_name(), action=f"set_team:{tie_id}:{which}")
 
 
 def _bd_point_cb(tie_id, ci, gi, who, delta):
     bd = state.load_bd()
     logic.bd_point(bd, tie_id, ci, gi, who, delta)
-    state.save_bd(bd, actor=st.session_state.get("admin_name", "admin"), action=f"point:{tie_id}")
+    state.save_bd(bd, actor=auth.actor_name(), action=f"point:{tie_id}")
 
 
 def _bd_score_set_cb(tie_id, ci, gi, who, key):
     bd = state.load_bd()
     logic.bd_set_point(bd, tie_id, ci, gi, who, st.session_state[key])
-    state.save_bd(bd, actor=st.session_state.get("admin_name", "admin"), action=f"set_score:{tie_id}")
+    state.save_bd(bd, actor=auth.actor_name(), action=f"set_score:{tie_id}")
 
 
 def _bd_finish_cb(tie_id, ci, gi):
     bd = state.load_bd()
     logic.bd_finish_game(bd, tie_id, ci, gi)
-    state.save_bd(bd, actor=st.session_state.get("admin_name", "admin"), action=f"finish:{tie_id}")
+    state.save_bd(bd, actor=auth.actor_name(), action=f"finish:{tie_id}")
 
 
 def _bd_reopen_cb(tie_id, ci, gi):
     bd = state.load_bd()
     logic.bd_reopen_game(bd, tie_id, ci, gi)
-    state.save_bd(bd, actor=st.session_state.get("admin_name", "admin"), action=f"reopen:{tie_id}")
+    state.save_bd(bd, actor=auth.actor_name(), action=f"reopen:{tie_id}")
 
 
 def _bd_reset_tie_cb(tie_id):
     bd = state.load_bd()
     logic.bd_reset_tie(bd, tie_id)
-    state.save_bd(bd, actor=st.session_state.get("admin_name", "admin"), action=f"reset_tie:{tie_id}")
+    state.save_bd(bd, actor=auth.actor_name(), action=f"reset_tie:{tie_id}")
 
 
 import streamlit.components.v1 as components
@@ -155,7 +155,7 @@ def _render_backup_restore_panel(sport):
                     st.warning(f"This will OVERWRITE current {label} data with the uploaded file's contents.")
                     if st.button("⚠️ Confirm restore", type="primary", use_container_width=True,
                                  key=f"{sport}_confirm_restore"):
-                        actor = st.session_state.get("admin_name", "admin")
+                        actor = auth.actor_name()
                         saver(pending[sport], actor=actor, action="restore_from_backup")
                         sched = state.load_schedule()
                         sched[sport] = pending.get("schedule", {}).get(sport, sched.get(sport, {}))
@@ -202,36 +202,51 @@ def _render_routing_repair_panel():
             "score numbers themselves are kept but the teams they're attached to may need re-checking."
         )
         if st.button("✅ Apply routing repair", type="primary", key="bd_apply_routing_repair"):
-            state.save_bd(repaired, actor=st.session_state.get("admin_name", "admin"), action="repair_routing")
+            state.save_bd(repaired, actor=auth.actor_name(), action="repair_routing")
             st.success("Routing repaired. Reloading…")
             st.rerun()
 
 
 def render_badminton_admin():
     auth.require_admin()
-    ui.page_header("Home / Badminton", "Badminton — Admin",
-                    "16 departments · Double elimination · First to 3 category wins · 15 pts (21 from semis)",
-                    "Admin mode", "navy")
+    _render_badminton_scoring(editable_structure=True)
 
-    _render_backup_restore_panel("bd")
-    _render_routing_repair_panel()
+
+def render_badminton_umpire():
+    auth.require_scorer()
+    _render_badminton_scoring(editable_structure=False)
+
+
+def _render_badminton_scoring(editable_structure: bool):
+    if editable_structure:
+        ui.page_header("Home / Badminton", "Badminton — Admin",
+                        "16 departments · Double elimination · First to 3 category wins · 15 pts (21 from semis)",
+                        "Admin mode", "navy")
+        _render_backup_restore_panel("bd")
+        _render_routing_repair_panel()
+    else:
+        ui.page_header("Home / Badminton", "Badminton — Umpiring",
+                        "Double elimination · First to 3 category wins · 15 pts (21 from semis)",
+                        "Umpire mode", "gold")
+        st.caption("👀 You can enter and adjust scores. Team names and bracket resets are locked to admins.")
 
     bd = state.load_bd()
 
-    top1, top2 = st.columns([3, 1])
-    with top2:
-        if st.button("↺ Reset entire bracket", use_container_width=True):
-            st.session_state["confirm_bd_reset"] = True
-        if st.session_state.get("confirm_bd_reset"):
-            st.warning("This clears **all** teams and scores. This cannot be undone.")
-            c1, c2 = st.columns(2)
-            if c1.button("Yes, reset", key="bd_reset_yes", type="primary", use_container_width=True):
-                state.reset_bd(actor=st.session_state.get("admin_name", "admin"))
-                st.session_state["confirm_bd_reset"] = False
-                st.rerun()
-            if c2.button("Cancel", key="bd_reset_no", use_container_width=True):
-                st.session_state["confirm_bd_reset"] = False
-                st.rerun()
+    if editable_structure:
+        top1, top2 = st.columns([3, 1])
+        with top2:
+            if st.button("↺ Reset entire bracket", use_container_width=True):
+                st.session_state["confirm_bd_reset"] = True
+            if st.session_state.get("confirm_bd_reset"):
+                st.warning("This clears **all** teams and scores. This cannot be undone.")
+                c1, c2 = st.columns(2)
+                if c1.button("Yes, reset", key="bd_reset_yes", type="primary", use_container_width=True):
+                    state.reset_bd(actor=auth.actor_name())
+                    st.session_state["confirm_bd_reset"] = False
+                    st.rerun()
+                if c2.button("Cancel", key="bd_reset_no", use_container_width=True):
+                    st.session_state["confirm_bd_reset"] = False
+                    st.rerun()
 
     champ = logic.bd_champion(bd)
     if champ:
@@ -245,22 +260,23 @@ def render_badminton_admin():
         components.html(html, height=bracket_svg.canvas_size()["h"] + 40, scrolling=True)
         return
 
-    st.caption("💡 Team fields are searchable dropdowns of the LBS/MGB roster — start typing to filter, "
-               "or type a name that isn't on the list and it'll be used as-is.")
+    if editable_structure:
+        st.caption("💡 Team fields are searchable dropdowns of the LBS/MGB roster — start typing to filter, "
+                   "or type a name that isn't on the list and it'll be used as-is.")
 
     st.markdown('<div class="lb-cat">Winners Bracket</div>', unsafe_allow_html=True)
-    _render_bd_round_columns(["W1", "W2", "W3", "W4"], bd)
+    _render_bd_round_columns(["W1", "W2", "W3", "W4"], bd, editable_structure)
 
     st.markdown('<div class="lb-cat" style="margin-top:22px">Losers Bracket</div>', unsafe_allow_html=True)
-    _render_bd_round_columns(["L1", "L2", "L3", "L4", "L5", "L6"], bd)
+    _render_bd_round_columns(["L1", "L2", "L3", "L4", "L5", "L6"], bd, editable_structure)
 
     st.markdown('<div class="lb-cat" style="margin-top:22px">Grand Final</div>', unsafe_allow_html=True)
     gf_col = st.columns(4)[0]
     with gf_col:
-        _render_bd_card("GF", bd["ties"]["GF"], 0)
+        _render_bd_card("GF", bd["ties"]["GF"], 0, editable_structure)
 
 
-def _render_bd_round_columns(round_ids, bd):
+def _render_bd_round_columns(round_ids, bd, editable_structure):
     cols = st.columns(len(round_ids))
     for col, r in zip(cols, round_ids):
         with col:
@@ -270,10 +286,10 @@ def _render_bd_round_columns(round_ids, bd):
             tie_ids = sorted([tid for tid in bd["ties"] if tid.split("_")[0] == r],
                               key=lambda t: int(t.split("_")[1]))
             for i, tid in enumerate(tie_ids):
-                _render_bd_card(tid, bd["ties"][tid], i)
+                _render_bd_card(tid, bd["ties"][tid], i, editable_structure)
 
 
-def _render_bd_card(tid, tie, match_no):
+def _render_bd_card(tid, tie, match_no, editable_structure=True):
     with st.container(border=True):
         top1, top2 = st.columns([1, 1])
         top1.caption(f"M{match_no + 1}" if tid != "GF" else "🏆 GF")
@@ -283,35 +299,39 @@ def _render_bd_card(tid, tie, match_no):
             f"{tie['w1']}–{tie['w2']}</div>", unsafe_allow_html=True,
         )
         k1, k2 = f"bdc_{tid}_t1", f"bdc_{tid}_t2"
-        ui.dept_combobox("Team A", tie["t1"], k1, _bd_team_change, (tid, "t1", k1), "Dept / Team A")
-        ui.dept_combobox("Team B", tie["t2"], k2, _bd_team_change, (tid, "t2", k2), "Dept / Team B")
+        ui.dept_combobox("Team A", tie["t1"], k1, _bd_team_change, (tid, "t1", k1), "Dept / Team A",
+                         disabled=not editable_structure)
+        ui.dept_combobox("Team B", tie["t2"], k2, _bd_team_change, (tid, "t2", k2), "Dept / Team B",
+                         disabled=not editable_structure)
         if tie["winner"]:
             st.caption("✅ Complete")
         elif tie["tbNeeded"]:
             st.caption("⚠️ Tie-breaker")
         if st.button("Score ▸", key=f"bdc_{tid}_open", use_container_width=True):
-            _bd_score_dialog(tid)
+            _bd_score_dialog(tid, editable_structure)
 
 
 @st.dialog("Match scoring", width="large")
-def _bd_score_dialog(tid):
+def _bd_score_dialog(tid, editable_structure=True):
     bd = state.load_bd()
     tie = bd["ties"][tid]
     round_id = tid.split("_")[0] if tid != "GF" else "GF"
     pts = logic.BD_ROUND_INFO[round_id]["pts"]
     st.caption(logic.BD_ROUND_INFO[round_id]["label"])
-    _render_bd_tie_editor(tid, tie, pts)
+    _render_bd_tie_editor(tid, tie, pts, editable_structure)
     if st.button("Close", use_container_width=True):
         st.rerun()
 
 
-def _render_bd_tie_editor(tid, tie, pts):
+def _render_bd_tie_editor(tid, tie, pts, editable_structure=True):
     c1, c2 = st.columns(2)
     k1, k2 = f"bd_{tid}_t1", f"bd_{tid}_t2"
     with c1:
-        ui.dept_combobox("Team A", tie["t1"], k1, _bd_team_change, (tid, "t1", k1), "Dept / Team A")
+        ui.dept_combobox("Team A", tie["t1"], k1, _bd_team_change, (tid, "t1", k1), "Dept / Team A",
+                         disabled=not editable_structure)
     with c2:
-        ui.dept_combobox("Team B", tie["t2"], k2, _bd_team_change, (tid, "t2", k2), "Dept / Team B")
+        ui.dept_combobox("Team B", tie["t2"], k2, _bd_team_change, (tid, "t2", k2), "Dept / Team B",
+                         disabled=not editable_structure)
 
     if tie["winner"]:
         ui.status_badge(f"Winner: {tie['t1'] if tie['winner'] == 1 else tie['t2']}", "ok")
@@ -359,7 +379,8 @@ def _render_bd_tie_editor(tid, tie, pts):
             st.markdown(f"**{catname}**")
             _games(_render_game)
 
-    st.button("↺ Reset this tie", key=f"bd_{tid}_reset", on_click=partial(_bd_reset_tie_cb, tid))
+    if editable_structure:
+        st.button("↺ Reset this tie", key=f"bd_{tid}_reset", on_click=partial(_bd_reset_tie_cb, tid))
 
 
 # ───────────────────────── pickleball callbacks ─────────────────────────
@@ -367,135 +388,157 @@ def _render_bd_tie_editor(tid, tie, pts):
 def _pk_pair_name_change(grp, idx, key):
     pk = state.load_pk()
     logic.pk_set_pair_name(pk, grp, idx, st.session_state[key])
-    state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action=f"set_pair:{grp}:{idx}")
+    state.save_pk(pk, actor=auth.actor_name(), action=f"set_pair:{grp}:{idx}")
 
 
 def _pk_add_pair_cb(grp):
     pk = state.load_pk()
     logic.pk_add_pair(pk, grp)
-    state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action=f"add_pair:{grp}")
+    state.save_pk(pk, actor=auth.actor_name(), action=f"add_pair:{grp}")
 
 
 def _pk_remove_pair_cb(grp):
     pk = state.load_pk()
     logic.pk_remove_pair(pk, grp)
-    state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action=f"remove_pair:{grp}")
+    state.save_pk(pk, actor=auth.actor_name(), action=f"remove_pair:{grp}")
 
 
 def _pk_point_cb(grp, i, j, gi, who, delta):
     pk = state.load_pk()
     logic.pk_point(pk, grp, i, j, gi, who, delta)
-    state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action=f"point:{grp}")
+    state.save_pk(pk, actor=auth.actor_name(), action=f"point:{grp}")
 
 
 def _pk_score_set_cb(grp, i, j, gi, who, key):
     pk = state.load_pk()
     logic.pk_set_point(pk, grp, i, j, gi, who, st.session_state[key])
-    state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action=f"set_score:{grp}")
+    state.save_pk(pk, actor=auth.actor_name(), action=f"set_score:{grp}")
 
 
 def _pk_finish_cb(grp, i, j, gi):
     pk = state.load_pk()
     logic.pk_finish_game(pk, grp, i, j, gi)
-    state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action=f"finish:{grp}")
+    state.save_pk(pk, actor=auth.actor_name(), action=f"finish:{grp}")
 
 
 def _pk_reopen_cb(grp, i, j, gi):
     pk = state.load_pk()
     logic.pk_reopen_game(pk, grp, i, j, gi)
-    state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action=f"reopen:{grp}")
+    state.save_pk(pk, actor=auth.actor_name(), action=f"reopen:{grp}")
 
 
 def _pk_auto_seed_cb():
     pk = state.load_pk()
     logic.pk_auto_seed_ko(pk)
-    state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action="auto_seed_ko")
+    state.save_pk(pk, actor=auth.actor_name(), action="auto_seed_ko")
 
 
 def _pk_ko_team_change(tid, which, key):
     pk = state.load_pk()
     logic.pk_ko_set_team(pk, tid, which, st.session_state[key])
-    state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action=f"ko_set_team:{tid}")
+    state.save_pk(pk, actor=auth.actor_name(), action=f"ko_set_team:{tid}")
 
 
 def _pk_ko_point_cb(tid, gi, who, delta):
     pk = state.load_pk()
     logic.pk_ko_point(pk, tid, gi, who, delta)
-    state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action=f"ko_point:{tid}")
+    state.save_pk(pk, actor=auth.actor_name(), action=f"ko_point:{tid}")
 
 
 def _pk_ko_score_set_cb(tid, gi, who, key):
     pk = state.load_pk()
     logic.pk_ko_set_point(pk, tid, gi, who, st.session_state[key])
-    state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action=f"ko_set_score:{tid}")
+    state.save_pk(pk, actor=auth.actor_name(), action=f"ko_set_score:{tid}")
 
 
 def _pk_ko_finish_cb(tid, gi):
     pk = state.load_pk()
     logic.pk_ko_finish_game(pk, tid, gi)
-    state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action=f"ko_finish:{tid}")
+    state.save_pk(pk, actor=auth.actor_name(), action=f"ko_finish:{tid}")
 
 
 def _pk_ko_reopen_cb(tid, gi):
     pk = state.load_pk()
     logic.pk_ko_reopen_game(pk, tid, gi)
-    state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action=f"ko_reopen:{tid}")
+    state.save_pk(pk, actor=auth.actor_name(), action=f"ko_reopen:{tid}")
 
 
 def _pk_ko_reset_tie_cb(tid):
     pk = state.load_pk()
     logic.pk_ko_reset_tie(pk, tid)
-    state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action=f"ko_reset:{tid}")
+    state.save_pk(pk, actor=auth.actor_name(), action=f"ko_reset:{tid}")
 
 
 def render_pickleball_admin():
     auth.require_admin()
-    ui.page_header("Home / Pickleball", "Pickleball — Admin",
-                    "22 pairs · 4 groups · Top 4 per group advance · Mixed doubles · Best of 3 to 15 pts",
-                    "Admin mode", "navy")
+    _render_pickleball_scoring(editable_structure=True)
 
-    _render_backup_restore_panel("pk")
 
-    top1, top2 = st.columns([3, 1])
-    with top2:
-        if st.button("↺ Reset everything", use_container_width=True):
-            st.session_state["confirm_pk_reset"] = True
-        if st.session_state.get("confirm_pk_reset"):
-            st.warning("This clears **all** pairs, groups and scores. This cannot be undone.")
-            c1, c2 = st.columns(2)
-            if c1.button("Yes, reset", key="pk_reset_yes", type="primary", use_container_width=True):
-                state.reset_pk(actor=st.session_state.get("admin_name", "admin"))
-                st.session_state["confirm_pk_reset"] = False
-                st.rerun()
-            if c2.button("Cancel", key="pk_reset_no", use_container_width=True):
-                st.session_state["confirm_pk_reset"] = False
-                st.rerun()
+def render_pickleball_umpire():
+    auth.require_scorer()
+    _render_pickleball_scoring(editable_structure=False)
+
+
+def _render_pickleball_scoring(editable_structure: bool):
+    if editable_structure:
+        ui.page_header("Home / Pickleball", "Pickleball — Admin",
+                        "22 pairs · 4 groups · Top 4 per group advance · Mixed doubles · Best of 3 to 15 pts",
+                        "Admin mode", "navy")
+        _render_backup_restore_panel("pk")
+    else:
+        ui.page_header("Home / Pickleball", "Pickleball — Umpiring",
+                        "4 groups · Top 4 per group advance · Mixed doubles · Best of 3 to 15 pts",
+                        "Umpire mode", "gold")
+        st.caption("👀 You can enter and adjust scores. Pair names, group setup, and resets are locked to admins.")
+
+    if editable_structure:
+        top1, top2 = st.columns([3, 1])
+        with top2:
+            if st.button("↺ Reset everything", use_container_width=True):
+                st.session_state["confirm_pk_reset"] = True
+            if st.session_state.get("confirm_pk_reset"):
+                st.warning("This clears **all** pairs, groups and scores. This cannot be undone.")
+                c1, c2 = st.columns(2)
+                if c1.button("Yes, reset", key="pk_reset_yes", type="primary", use_container_width=True):
+                    state.reset_pk(actor=auth.actor_name())
+                    st.session_state["confirm_pk_reset"] = False
+                    st.rerun()
+                if c2.button("Cancel", key="pk_reset_no", use_container_width=True):
+                    st.session_state["confirm_pk_reset"] = False
+                    st.rerun()
 
     pk = state.load_pk()
     champ = logic.pk_champion(pk)
     if champ:
         st.success(f"🏆 Champion: **{champ}**")
 
-    tab1, tab2, tab3 = st.tabs(["👥 Pairs & Groups", "🔁 Group Matches", "🏆 Knockout Bracket"])
+    # Umpires don't need (or get) the Pairs & Groups setup tab — they only
+    # ever touch scores, so their tab bar skips straight to matches.
+    if editable_structure:
+        tab1, tab2, tab3 = st.tabs(["👥 Pairs & Groups", "🔁 Group Matches", "🏆 Knockout Bracket"])
+    else:
+        tab1 = None
+        tab2, tab3 = st.tabs(["🔁 Group Matches", "🏆 Knockout Bracket"])
 
-    with tab1:
-        cols = st.columns(2)
-        for i, grp in enumerate(["A", "B", "C", "D"]):
-            with cols[i % 2]:
-                st.subheader(f"Group {grp}")
-                pairs = pk["groups"][grp]
-                for idx, p in enumerate(pairs):
-                    key = f"pk_{grp}_{idx}_name"
-                    st.text_input(f"Pair {idx + 1}", value=p["name"], key=key,
-                                  on_change=_pk_pair_name_change, args=(grp, idx, key))
-                bc1, bc2 = st.columns(2)
-                bc1.button(f"− Remove pair (Group {grp})", key=f"pk_{grp}_remove",
-                           on_click=partial(_pk_remove_pair_cb, grp), use_container_width=True,
-                           disabled=len(pairs) <= 4)
-                bc2.button(f"+ Add pair (Group {grp})", key=f"pk_{grp}_add",
-                           on_click=partial(_pk_add_pair_cb, grp), use_container_width=True,
-                           disabled=len(pairs) >= 10)
-                st.markdown("---")
+    if tab1 is not None:
+        with tab1:
+            cols = st.columns(2)
+            for i, grp in enumerate(["A", "B", "C", "D"]):
+                with cols[i % 2]:
+                    st.subheader(f"Group {grp}")
+                    pairs = pk["groups"][grp]
+                    for idx, p in enumerate(pairs):
+                        key = f"pk_{grp}_{idx}_name"
+                        st.text_input(f"Pair {idx + 1}", value=p["name"], key=key,
+                                      on_change=_pk_pair_name_change, args=(grp, idx, key))
+                    bc1, bc2 = st.columns(2)
+                    bc1.button(f"− Remove pair (Group {grp})", key=f"pk_{grp}_remove",
+                               on_click=partial(_pk_remove_pair_cb, grp), use_container_width=True,
+                               disabled=len(pairs) <= 4)
+                    bc2.button(f"+ Add pair (Group {grp})", key=f"pk_{grp}_add",
+                               on_click=partial(_pk_add_pair_cb, grp), use_container_width=True,
+                               disabled=len(pairs) >= 10)
+                    st.markdown("---")
 
     with tab2:
         grp = st.selectbox("Group", ["A", "B", "C", "D"], key="pk_matches_group")
@@ -531,12 +574,13 @@ def render_pickleball_admin():
                             t1_name=t1, t2_name=t2,
                         )
         # persist any match dicts created on-the-fly by pk_get_match
-        state.save_pk(pk, actor=st.session_state.get("admin_name", "admin"), action="touch_matches")
+        state.save_pk(pk, actor=auth.actor_name(), action="touch_matches")
 
     with tab3:
-        st.button("⚡ Auto-seed Round of 16 from current group standings", on_click=_pk_auto_seed_cb)
-        st.caption("Cross-seeds so an A/D-side qualifier always meets a B/C-side qualifier in the quarter-finals.")
-        st.markdown("---")
+        if editable_structure:
+            st.button("⚡ Auto-seed Round of 16 from current group standings", on_click=_pk_auto_seed_cb)
+            st.caption("Cross-seeds so an A/D-side qualifier always meets a B/C-side qualifier in the quarter-finals.")
+            st.markdown("---")
         for r in ["K1", "K2", "K3", "GF"]:
             ids = sorted([tid for tid in pk["ko"] if (tid.startswith(r + "_") or (r == "GF" and tid == "GF"))])
             if not ids:
@@ -548,8 +592,10 @@ def render_pickleball_admin():
                 with st.expander(f"{tie['t1'] or 'TBD'}  vs  {tie['t2'] or 'TBD'}{badge}"):
                     k1, k2 = f"pkko_{tid}_t1", f"pkko_{tid}_t2"
                     c1, c2 = st.columns(2)
-                    c1.text_input("Pair A", value=tie["t1"], key=k1, on_change=_pk_ko_team_change, args=(tid, "t1", k1))
-                    c2.text_input("Pair B", value=tie["t2"], key=k2, on_change=_pk_ko_team_change, args=(tid, "t2", k2))
+                    c1.text_input("Pair A", value=tie["t1"], key=k1, on_change=_pk_ko_team_change, args=(tid, "t1", k1),
+                                  disabled=not editable_structure)
+                    c2.text_input("Pair B", value=tie["t2"], key=k2, on_change=_pk_ko_team_change, args=(tid, "t2", k2),
+                                  disabled=not editable_structure)
                     for gi in logic.visible_games(tie["games"]):
                         g = tie["games"][gi]
                         key_prefix = f"pkko_{tid}_{gi}"
@@ -563,7 +609,8 @@ def render_pickleball_admin():
                             pts_target=PK_PTS,
                             t1_name=tie["t1"] or "Pair A", t2_name=tie["t2"] or "Pair B",
                         )
-                    st.button("↺ Reset this match", key=f"pkko_{tid}_reset", on_click=partial(_pk_ko_reset_tie_cb, tid))
+                    if editable_structure:
+                        st.button("↺ Reset this match", key=f"pkko_{tid}_reset", on_click=partial(_pk_ko_reset_tie_cb, tid))
 
 
 # ───────────────────────── settings / schedule ─────────────────────────
@@ -595,7 +642,7 @@ def render_settings():
             sched["pk"][r] = new_val
 
     if st.button("💾 Save schedule", type="primary"):
-        state.save_schedule(sched, actor=st.session_state.get("admin_name", "admin"))
+        state.save_schedule(sched, actor=auth.actor_name())
         st.success("Schedule saved.")
 
     st.markdown("---")
