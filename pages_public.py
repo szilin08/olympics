@@ -415,7 +415,7 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
     return f"""
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <div style="color-scheme:dark;background:#111110;padding:20px;border-radius:12px;font-family:'Inter',sans-serif;min-height:850px">
-      <div id="bd-live-now">
+      <div id="bd-live-now" class="{'bd-fs' if live_only else ''}">
         <div class="bd-fs-topbar" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px">
           <div style="display:flex;align-items:center;gap:8px">
             <span style="width:8px;height:8px;border-radius:50%;background:#f43f5e;display:inline-block"></span>
@@ -451,10 +451,16 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
       {overview_html}
     </div>
     <script>
+      // On the projector/kiosk page (live_only), the big jumbotron sizing
+      // is on by default — no need to press Full Screen just to get
+      // readable fonts. bdSetFsUi still runs on real fullscreenchange
+      // events (for the OS-level Fullscreen API path), but it should never
+      // shrink things back down below that baseline.
+      var BD_FORCE_BIG = {str(live_only).lower()};
       function bdSetFsUi(active) {{
         var el = document.getElementById('bd-live-now');
         var btn = document.getElementById('bd-fs-btn');
-        if (el) el.classList.toggle('bd-fs', active);
+        if (el) el.classList.toggle('bd-fs', active || BD_FORCE_BIG);
         if (btn) btn.innerHTML = active ? '⛶ Exit Full Screen' : '⛶ Full Screen';
         var brand = document.querySelectorAll('.bd-fs-brand');
         for (var i = 0; i < brand.length; i++) brand[i].style.display = active ? 'inline' : 'none';
@@ -539,28 +545,26 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
          above and give the multi-tile grid its own, much more modest sizing
          instead of inheriting single-card jumbo sizing wholesale.
 
-         Fixed column COUNT, not a minmax minimum: an actual fullscreen
-         display (real monitor/TV, via the Fullscreen API) can be far wider
-         than a normal browser window — 2500px+ isn't unusual — and a
-         minmax(300px,1fr) minimum only forces a wrap once there's no
-         longer room for another 300px column. On a wide enough screen, 7
-         or 8 tiles can still all fit on one row shoulder-to-shoulder at
-         300px+ each, which is exactly what was still happening. A fixed
-         `repeat(4, 1fr)` guarantees at most 4 tiles per row no matter how
-         wide the actual display is — the 5th tile always wraps to a new
-         row instead of the grid just adding a 5th column when there's
-         space for one. */
+         Auto-fit instead of a fixed column count: with only a couple of
+         matches live (the common case), forcing exactly 4 columns left 2
+         of those columns empty and shrank the live cards down to a
+         quarter-width sliver instead of letting them fill the space. A
+         generous minmax (380px) still caps out around 4-5 per row on a
+         real widescreen display, but lets 1-3 live matches actually use
+         the available width instead of stranding it as empty grid cells. */
       #bd-live-now.bd-fs .bd-fs-multi {{
-        grid-template-columns: repeat(4, 1fr) !important;
+        grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important;
       }}
       #bd-live-now.bd-fs .bd-fs-multi table th {{
-        font-size: 14px !important; padding: 6px 10px !important;
+        font-size: 17px !important; padding: 8px 14px !important;
       }}
       #bd-live-now.bd-fs .bd-fs-multi table td {{
-        font-size: 20px !important; padding: 8px 12px !important;
+        font-size: 26px !important; padding: 10px 14px !important;
       }}
+      #bd-live-now.bd-fs .bd-fs-multi table td.bd-name-cell {{ font-size: 30px !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi table td.bd-tally-cell {{ font-size: 30px !important; color: #d99a2b !important; }}
       #bd-live-now.bd-fs .bd-fs-multi [style*="min-width:200px"] {{
-        border-radius: 10px !important; padding: 16px !important;
+        border-radius: 10px !important; padding: 20px !important;
         box-shadow: 0 8px 24px rgba(0,0,0,.4) !important;
       }}
       #bd-live-now:fullscreen {{ background: #0a0a08; }}
@@ -982,7 +986,7 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
     return f"""
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <div style="color-scheme:dark;background:#111110;padding:20px;border-radius:12px;font-family:'Inter',sans-serif;min-height:850px">
-      <div id="pk-live-now">
+      <div id="pk-live-now" class="{'pk-fs' if live_only else ''}">
         <div class="pk-fs-topbar" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px">
           <div style="display:flex;align-items:center;gap:8px">
             <span style="width:8px;height:8px;border-radius:50%;background:#f43f5e;display:inline-block"></span>
@@ -1018,10 +1022,11 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
       {overview_html}
     </div>
     <script>
+      var PK_FORCE_BIG = {str(live_only).lower()};
       function pkSetFsUi(active) {{
         var el = document.getElementById('pk-live-now');
         var btn = document.getElementById('pk-fs-btn');
-        if (el) el.classList.toggle('pk-fs', active);
+        if (el) el.classList.toggle('pk-fs', active || PK_FORCE_BIG);
         if (btn) btn.innerHTML = active ? '⛶ Exit Full Screen' : '⛶ Full Screen';
         var brand = document.querySelectorAll('.pk-fs-brand');
         for (var i = 0; i < brand.length; i++) brand[i].style.display = active ? 'inline' : 'none';
@@ -1096,24 +1101,23 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
          single-card jumbo fonts/padding, which was dwarfing every tile's
          numbers and only leaving room for a couple of columns per row.
 
-         Fixed column COUNT rather than a minmax minimum: a real fullscreen
-         display can be wide enough (2500px+) that even a 300px-per-column
-         minimum still lets 7-8 tiles all fit on a single row — which is
-         exactly what was still happening. `repeat(4, 1fr)` guarantees at
-         most 4 tiles per row on any screen size; a 5th tile always wraps
-         to a new row instead of the grid adding a 5th column whenever
-         there happens to be room for one. */
+         Auto-fit instead of a fixed column count — see the matching
+         comment on .bd-fs-multi: with only 1-3 matches live (the common
+         case) a fixed 4-column grid stranded empty columns instead of
+         letting those tiles fill the width. */
       #pk-live-now.pk-fs .pk-fs-multi {{
-        grid-template-columns: repeat(4, 1fr) !important;
+        grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important;
       }}
       #pk-live-now.pk-fs .pk-fs-multi table th {{
-        font-size: 14px !important; padding: 6px 10px !important;
+        font-size: 17px !important; padding: 8px 14px !important;
       }}
       #pk-live-now.pk-fs .pk-fs-multi table td {{
-        font-size: 20px !important; padding: 8px 12px !important;
+        font-size: 26px !important; padding: 10px 14px !important;
       }}
+      #pk-live-now.pk-fs .pk-fs-multi table td.pk-name-cell {{ font-size: 30px !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi table td.pk-tally-cell {{ font-size: 30px !important; color: #d99a2b !important; }}
       #pk-live-now.pk-fs .pk-fs-multi [style*="min-width:200px"] {{
-        border-radius: 10px !important; padding: 16px !important;
+        border-radius: 10px !important; padding: 20px !important;
         box-shadow: 0 8px 24px rgba(0,0,0,.4) !important;
       }}
       #pk-live-now:fullscreen {{ background: #0a0a08; }}
