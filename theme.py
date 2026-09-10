@@ -403,33 +403,6 @@ def inject_css():
         [data-testid="stExpander"] summary {{ font-weight: 600; color: {INK}; }}
         [data-testid="stExpander"] summary:hover {{ color: {GOLD_DK}; }}
 
-        /* Expanders inside the scoring dialog (finished-game / finished-
-           category summary rows) need the same fixed-dark treatment as
-           everything else in the dialog. The generic rule right above
-           this one sets the expander's background to the {CARD} variable,
-           which is WHITE in light mode; the dialog wrapper's own
-           "force dark" rule (`[data-testid="stDialog"] > div`, above)
-           only sets ITS OWN background, which doesn't cascade down to a
-           nested element's background (only text color inherits) — so
-           the expander card was rendering as a white box with faint
-           gray text and a barely-visible checkmark inside an otherwise
-           dark dialog. Pin its background, border, and summary text/icon
-           color explicitly, same fixed dark tone as the rest of the
-           dialog controls. */
-        [data-testid="stDialog"] [data-testid="stExpander"] {{
-            background: #0f1626 !important;
-            border-color: rgba(255,255,255,.16) !important;
-        }}
-        [data-testid="stDialog"] [data-testid="stExpander"] summary {{
-            color: #e8eaf0 !important;
-        }}
-        [data-testid="stDialog"] [data-testid="stExpander"] summary svg {{
-            fill: #e8eaf0 !important;
-        }}
-        [data-testid="stDialog"] [data-testid="stExpander"] summary:hover {{
-            color: {GOLD_LT} !important;
-        }}
-
         /* container(border=True) cards */
         [data-testid="stVerticalBlockBorderWrapper"] > div {{
             background: {CARD}; border-color: {BORDER} !important; border-radius: 10px;
@@ -538,6 +511,30 @@ def inject_css():
         }}
         .sb-user-name {{ font-size:12px; font-weight:700; color:{SB_TEXT_HI}; }}
         .sb-user-role {{ font-size:10px; color:{MUTED}; letter-spacing:.04em; }}
+
+        /* ── kiosk / projector fullscreen mode ──
+           Toggled by JS on <body> when the Live Monitor's "Full Screen"
+           button is used (see pages_public.py). The button actually
+           fullscreens the WHOLE tab (document.documentElement), not just
+           the scoreboard widget, specifically because that widget lives
+           inside a components.html iframe that gets a fresh srcdoc on
+           every auto-refresh rerun — fullscreening an element THAT gets
+           destroyed/recreated every N seconds is what closed fullscreen on
+           refresh. Fullscreening the tab itself survives reruns since
+           Streamlit never tears down <html>/<body>. These rules just hide
+           the normal app chrome around it so it still reads as a clean,
+           edge-to-edge scoreboard rather than the full dashboard UI. */
+        body.lbs-kiosk [data-testid="stSidebar"],
+        body.lbs-kiosk [data-testid="stHeader"],
+        body.lbs-kiosk [data-testid="stToolbar"],
+        body.lbs-kiosk [data-testid="stStatusWidget"],
+        body.lbs-kiosk footer {{ display: none !important; }}
+        body.lbs-kiosk [data-testid="stAppViewContainer"] {{ margin-left: 0 !important; }}
+        body.lbs-kiosk [data-testid="stMain"] .block-container,
+        body.lbs-kiosk [data-testid="stAppViewContainer"] .block-container {{
+            padding: 0 !important; max-width: 100% !important;
+        }}
+        body.lbs-kiosk {{ background: #0a0a08 !important; }}
         </style>
         """,
         unsafe_allow_html=True,
