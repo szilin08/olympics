@@ -1,181 +1,238 @@
-"""
-Simple shared-password admin + umpire auth.
-
-Anyone can view the dashboard/monitors. To reach the input/scoring pages,
-a user must unlock either:
-  - "Admin mode" — full access: team/pair names, resets, backup/restore,
-    schedule, and scoring.
-  - "Umpire mode" — scoring only. Umpires can open the same List/Scoring
-    (badminton) and Group Matches / Knockout Bracket (pickleball) views
-    and enter/adjust points, but every control that changes who's playing
-    or wipes data (team/pair name fields, resets, backup/restore, auto-seed)
-    is hidden or disabled for them.
-
-Both passwords are never stored in plain text in code: they're compared as
-SHA-256 hashes. Set each via (in priority order):
-  Admin:
-    1. Streamlit secrets:  st.secrets["admin_password"]
-    2. Environment var:    TOURNEY_ADMIN_PASSWORD
-    3. Fallback default:   "changeme123"  (⚠ change this before real use)
-  Umpire:
-    1. Streamlit secrets:  st.secrets["umpire_password"]
-    2. Environment var:    TOURNEY_UMPIRE_PASSWORD
-    3. Fallback default:   "umpire123"    (⚠ change this before real use)
-"""
-
-import hashlib
-import os
-
 import streamlit as st
+import streamlit.components.v1 as components
 
+import assets
+import auth
+import db
 import theme
+import pages_public
+import pages_admin
 
-DEFAULT_PASSWORD = "olympics123"
-DEFAULT_UMPIRE_PASSWORD = "umpire123"
+st.set_page_config(page_title="LBS × MGB Sports Tournament", page_icon="🏆", layout="wide")
+db.init_db()
+theme.inject_css()
 
+# Streamlit Community Cloud's free tier shows a "Hosted with Streamlit"
+# badge, and — for apps deployed from a public repo — a "Fork" option, to
+# every visitor. Neither is owner-only chrome, and there's no official
+# setting to turn either off (the Fork option specifically requires the
+# GitHub repo to be public, which is what enables it — the only fully
+# reliable way to remove it is a private repo, which on the free tier means
+# named-viewer-only access instead of one link anyone can open). This is a
+# community-documented workaround, not something Streamlit provides support
+# for: unlike st.markdown, components.html actually executes <script> tags
+# (it renders in a real iframe with srcdoc, not via innerHTML), and
+# window.top reaches up out of that iframe to the actual outer page where
+# this chrome lives.
+#
+# An earlier version walked up a fixed 3 ancestor levels from any element
+# whose text was "Fork" to clear a wrapping pill background. Tested against
+# a mock toolbar with the icon+text nesting this kind of chrome actually
+# uses, that fixed-depth walk overshot past the toolbar entirely and hid
+# <body> — a blank page for every visitor. This version only ever hides a
+# LEAF element (no child elements of its own) whose own trimmed text is
+# exactly "Fork", never climbing to any ancestor — verified against that
+# same mock to correctly hide the word without touching surrounding
+# content, even a deliberately similar "Fork lift operator training"
+# button. It also polls every 800ms rather than running once, since
+# Community Cloud appears to inject this toolbar asynchronously after the
+# page's initial render. The trade-off: a small empty pill outline may
+# remain next to the "⋮" menu rather than disappearing entirely — worth it
+# for guaranteed safety over a cosmetic remnant. Still a visual hide via
+# best-effort text matching, not a real removal — if Streamlit changes
+# their page structure this may need updating again.
+components.html(
+    '<script>'
+    'function lbsHideCloudChrome(){'
+    'var doc=window.top.document;'
+    'doc.querySelectorAll(\'[href*="streamlit.io"]\').forEach(function(e){e.style.display="none";});'
+    'Array.from(doc.querySelectorAll("button,a,span,div")).forEach(function(e){'
+    'if(e.children.length===0&&e.textContent.trim()==="Fork"){'
+    'e.style.display="none";'
+    '}});'
+    '}'
+    'lbsHideCloudChrome();'
+    'setInterval(lbsHideCloudChrome,800);'
+    '</script>',
+    height=0,
+)
 
-def _password_source() -> str:
-    """Which source is actually supplying the password right now — for the
-    diagnostic line in the login box. Never reveals the password itself."""
-    try:
-        if "admin_password" in st.secrets:
-            return "secrets.toml"
-    except Exception:
-        pass
-    if os.environ.get("TOURNEY_ADMIN_PASSWORD"):
-        return "environment variable"
-    return "built-in default (changeme123)"
+VIEWER_PAGES = [
+    ("Badminton", "🏸", pages_public.render_badminton_monitor),
+    ("Pickleball", "🏓", pages_public.render_pickleball_monitor),
+]
 
+ADMIN_PAGES = [
+    ("Badminton — Admin", "🎯", pages_admin.render_badminton_admin),
+    ("Pickleball — Admin", "📝", pages_admin.render_pickleball_admin),
+]
 
-def _get_admin_password() -> str:
-    try:
-        if "admin_password" in st.secrets:
-            return str(st.secrets["admin_password"])
-    except Exception:
-        pass
-    return os.environ.get("TOURNEY_ADMIN_PASSWORD", DEFAULT_PASSWORD)
-
-
-def _umpire_password_source() -> str:
-    try:
-        if "umpire_password" in st.secrets:
-            return "secrets.toml"
-    except Exception:
-        pass
-    if os.environ.get("TOURNEY_UMPIRE_PASSWORD"):
-        return "environment variable"
-    return "built-in default (umpire123)"
-
-
-def _get_umpire_password() -> str:
-    try:
-        if "umpire_password" in st.secrets:
-            return str(st.secrets["umpire_password"])
-    except Exception:
-        pass
-    return os.environ.get("TOURNEY_UMPIRE_PASSWORD", DEFAULT_UMPIRE_PASSWORD)
-
-
-def _hash(pw: str) -> str:
-    return hashlib.sha256(pw.encode("utf-8")).hexdigest()
-
-
-def is_admin() -> bool:
-    return bool(st.session_state.get("is_admin", False))
-
-
-def is_umpire() -> bool:
-    return bool(st.session_state.get("is_umpire", False))
-
-
-def is_scorer() -> bool:
-    """True for anyone allowed to open a scoring page: full admins and
-    umpires alike. Use this to gate access to umpiring pages."""
-    return is_admin() or is_umpire()
-
-
-def can_edit_structure() -> bool:
-    """True only for full admins. Gates anything that changes *who's
-    playing* or destroys data — team/pair name fields, resets, auto-seed,
-    backup/restore — as opposed to just entering points, which umpires can
-    also do."""
-    return is_admin()
+UMPIRE_PAGES = [
+    ("Badminton — Umpiring", "🏸", pages_admin.render_badminton_umpire),
+    ("Pickleball — Umpiring", "🏓", pages_admin.render_pickleball_umpire),
+]
 
 
-def actor_name() -> str:
-    """Display/audit-log name for whoever is currently allowed to score —
-    admin or umpire, whichever is active."""
-    return st.session_state.get("admin_name", "admin")
+def _nav_button(label, icon, active):
+    clicked = st.button(
+        label, key=f"navbtn_{label}", use_container_width=True,
+        type="primary" if active else "secondary",
+    )
+    if clicked:
+        st.session_state["current_page"] = label
+        st.rerun()
 
 
-def login_widget():
-    """Renders a small login form in the sidebar. Returns nothing; sets session state."""
-    if is_admin():
-        T = theme.LIGHT if theme.get_mode() == "light" else theme.DARK
-        st.sidebar.markdown(
-            f'<div style="font-size:12px;font-weight:700;color:{T["pill_green_fg"]};margin-bottom:6px">'
-            f'🔓 Admin mode active</div>',
+def _intro_overlay_html():
+    """One-time cinematic welcome splash, shown only on the very first
+    render of a session (gated by session_state in main(), not here).
+    Built as pure CSS keyframe animation — no <script> tag and no onclick
+    JS, since st.markdown injects via innerHTML, which browsers do not
+    execute embedded <script> tags for (a real Streamlit quirk hit earlier
+    in this project — components.html's iframe does execute scripts,
+    plain st.markdown does not). A purely CSS-driven auto-dismiss sidesteps
+    that entirely: the outer overlay carries its own keyframe animation
+    that holds it opaque for ~3.6s then fades it to invisible AND
+    pointer-events:none over the final ~0.9s, so it never blocks clicks
+    on the dashboard underneath once it's done. Built as one unbroken
+    concatenation (no literal blank lines) for the same reason the crest
+    SVG was — a blank line inside a multi-line HTML string fed to
+    st.markdown ends the raw-HTML block early under Streamlit's CommonMark
+    parser, even with unsafe_allow_html=True."""
+    crest_b64 = assets.CREST_LOGO_B64
+    style = (
+        "<style>"
+        "@keyframes lbsIntroFade{0%{opacity:0;transform:translateY(8px);}100%{opacity:1;transform:translateY(0);}}"
+        "@keyframes lbsIntroScale{0%{opacity:0;transform:scale(.6);}100%{opacity:1;transform:scale(1);}}"
+        "@keyframes lbsOverlayOut{0%{opacity:1;}80%{opacity:1;}100%{opacity:0;visibility:hidden;pointer-events:none;}}"
+        "</style>"
+    )
+    overlay = (
+        '<div style="position:fixed;inset:0;z-index:999999;'
+        'background:radial-gradient(circle at 50% 35%,#151b2c 0%,#0a0e17 65%);'
+        'display:flex;align-items:center;justify-content:center;flex-direction:column;'
+        'animation:lbsOverlayOut 4.5s ease forwards;">'
+        '<div style="animation:lbsIntroScale .9s cubic-bezier(.2,.8,.2,1) both;">'
+        f'<img src="data:image/png;base64,{crest_b64}" alt="LBS Olympics Championship" '
+        'style="width:150px;height:150px;filter:drop-shadow(0 6px 24px rgba(217,154,43,.35));">'
+        '</div>'
+        '<div style="margin-top:26px;font-family:\'DM Mono\',monospace;font-size:13px;letter-spacing:.35em;'
+        'color:#d99a2b;text-transform:uppercase;opacity:0;animation:lbsIntroFade .8s ease .5s forwards;">Welcome to</div>'
+        '<div style="margin-top:10px;font-size:44px;font-weight:800;color:#fdf3e4;letter-spacing:-0.01em;'
+        'text-align:center;opacity:0;animation:lbsIntroFade .9s ease .8s forwards;">LBS '
+        '<span style="font-style:italic;font-family:\'Playfair Display\',serif;color:#e2984a;font-weight:600;">'
+        'Olympics</span> 2026</div>'
+        '<div style="margin-top:14px;font-family:\'DM Mono\',monospace;font-size:11px;letter-spacing:.2em;'
+        'color:#8b93a6;text-transform:uppercase;opacity:0;animation:lbsIntroFade .8s ease 1.2s forwards;">'
+        'Badminton &times; Pickleball Championship</div>'
+        '<div style="margin-top:34px;width:64px;height:2px;'
+        'background:linear-gradient(90deg,transparent,#d99a2b,transparent);'
+        'opacity:0;animation:lbsIntroFade .8s ease 1.6s forwards;"></div>'
+        '</div>'
+    )
+    return style + overlay
+
+
+def main():
+    kiosk = st.query_params.get("kiosk")
+    if kiosk in ("badminton", "pickleball"):
+        # A bare, chrome-free page meant to be opened on its own — e.g. on
+        # a projector or a dedicated kiosk laptop — instead of navigating
+        # to the Live Monitor tab inside the full app. There's no sidebar
+        # or header rendered here at all, so there's no Streamlit chrome
+        # for the in-page "Full Screen" button's refresh cycle to ever
+        # expose again; and because this page never builds any of that
+        # chrome in the first place, the browser's OWN fullscreen (F11) can
+        # be used on the tab and it'll stay clean through every refresh,
+        # since browser-level fullscreen isn't tied to any on-page element
+        # the way the JS Fullscreen API is.
+        if kiosk == "badminton":
+            pages_public.render_badminton_kiosk()
+        else:
+            pages_public.render_pickleball_kiosk()
+        return
+
+    if "intro_played" not in st.session_state:
+        st.session_state["intro_played"] = True
+        st.markdown(_intro_overlay_html(), unsafe_allow_html=True)
+
+    if "current_page" not in st.session_state:
+        st.session_state["current_page"] = "Badminton"
+
+    available = dict((label, fn) for label, _, fn in VIEWER_PAGES)
+    if auth.is_admin():
+        available.update((label, fn) for label, _, fn in ADMIN_PAGES)
+    if auth.is_scorer():
+        available.update((label, fn) for label, _, fn in UMPIRE_PAGES)
+
+    # Bounce back to the default viewer page if the current page no longer
+    # exists — either the admin logged out while on an admin-only page, or
+    # (as with the removed Schedule & Settings and Home pages) a page was
+    # retired while someone's session still pointed at it.
+    if st.session_state["current_page"] not in available:
+        st.session_state["current_page"] = "Badminton"
+
+    with st.sidebar:
+        st.markdown(
+            f"""
+            <div class="sb-partner-logo">
+                <img src="data:image/png;base64,{assets.LBS_LOGO_B64}" alt="LBS 65 Years">
+            </div>
+            """,
             unsafe_allow_html=True,
         )
-        if st.sidebar.button("Log out of admin", key="logout_btn", use_container_width=True, type="primary"):
-            st.session_state["is_admin"] = False
-            st.session_state["current_page"] = "Home"
-            st.rerun()
-        return
-
-    with st.sidebar.expander("🔒 Admin login", expanded=False):
-        st.caption(f"Password source: **{_password_source()}**")
-        pw = st.text_input("Admin password", type="password", key="admin_pw_input")
-        if st.button("Unlock admin mode", key="unlock_btn", use_container_width=True, type="primary"):
-            if _hash(pw) == _hash(_get_admin_password()):
-                st.session_state["is_admin"] = True
-                st.session_state["admin_name"] = st.session_state.get("admin_name_input", "admin")
-                st.rerun()
-            else:
-                st.error("Incorrect password.")
-
-
-def require_admin():
-    """Call at the top of an admin-only page. Stops rendering if not logged in."""
-    if not is_admin():
-        st.warning("🔒 This page is for tournament admins only. Unlock admin mode from the sidebar to continue.")
-        st.stop()
-
-
-def umpire_login_widget():
-    """Renders the umpire login/status box in the sidebar. A logged-in admin
-    already has full scoring access, so this box only needs to appear for
-    people who aren't already admins."""
-    if is_admin():
-        return
-
-    if is_umpire():
-        T = theme.LIGHT if theme.get_mode() == "light" else theme.DARK
-        st.sidebar.markdown(
-            f'<div style="font-size:12px;font-weight:700;color:{T["pill_green_fg"]};margin-bottom:6px">'
-            f'🎙️ Umpire mode active</div>',
+        st.markdown(
+            f"""
+            <div class="sb-logo-wrap">
+                <div class="sb-crest"><img src="data:image/png;base64,{assets.CREST_LOGO_B64}" alt="LBS Olympics Championship"></div>
+                <div class="sb-logo-title">LBS <span class="sb-logo-x">×</span> MGB</div>
+                <div class="sb-logo-sub">Sports Tournament</div>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
-        if st.sidebar.button("Log out of umpire", key="logout_umpire_btn", use_container_width=True, type="primary"):
-            st.session_state["is_umpire"] = False
-            st.session_state["current_page"] = "Home"
-            st.rerun()
-        return
 
-    with st.sidebar.expander("🎙️ Umpire login", expanded=False):
-        pw = st.text_input("Umpire password", type="password", key="umpire_pw_input")
-        if st.button("Unlock umpire mode", key="unlock_umpire_btn", use_container_width=True, type="primary"):
-            if _hash(pw) == _hash(_get_umpire_password()):
-                st.session_state["is_umpire"] = True
-                st.session_state["admin_name"] = "umpire"
-                st.rerun()
-            else:
-                st.error("Incorrect password.")
+        st.markdown('<div class="nav-label">Viewer</div>', unsafe_allow_html=True)
+        for label, icon, _ in VIEWER_PAGES:
+            _nav_button(label, icon, st.session_state["current_page"] == label)
+
+        if auth.is_admin():
+            st.markdown('<div class="nav-label">Admin</div>', unsafe_allow_html=True)
+            for label, icon, _ in ADMIN_PAGES:
+                _nav_button(label, icon, st.session_state["current_page"] == label)
+
+        if auth.is_scorer():
+            st.markdown('<div class="nav-label">Umpiring</div>', unsafe_allow_html=True)
+            for label, icon, _ in UMPIRE_PAGES:
+                _nav_button(label, icon, st.session_state["current_page"] == label)
+
+        # ── bottom block: admin + umpire login, then the user chip with the
+        # dark/light toggle sitting right beside it in a narrow column ──
+        st.markdown('<hr class="sb-bottom-divider">', unsafe_allow_html=True)
+        auth.login_widget()
+        auth.umpire_login_widget()
+
+        who = st.session_state.get("admin_name", "Viewer") if auth.is_scorer() else "Viewer"
+        role = "Admin" if auth.is_admin() else ("Umpire" if auth.is_umpire() else "Viewer")
+        user_col, toggle_col = st.columns([4, 1])
+        with user_col:
+            st.markdown(
+                f"""
+                <div class="sb-user-row">
+                    <div class="sb-avatar">{who[:2].upper()}</div>
+                    <div>
+                        <div class="sb-user-name">{who}</div>
+                        <div class="sb-user-role">{role.upper()}</div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with toggle_col:
+            theme.toggle_widget()
+
+    available[st.session_state["current_page"]]()
 
 
-def require_scorer():
-    """Call at the top of an umpiring page. Allows both umpires and full
-    admins through; stops rendering for anyone else."""
-    if not is_scorer():
-        st.warning("🔒 This page is for umpires/admins only. Unlock umpire or admin mode from the sidebar to continue.")
-        st.stop()
+if __name__ == "__main__":
+    main()
