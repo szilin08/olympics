@@ -58,7 +58,6 @@ components.html(
 )
 
 VIEWER_PAGES = [
-    ("Home", "🏠", pages_public.render_overview),
     ("Badminton", "🏸", pages_public.render_badminton_monitor),
     ("Pickleball", "🏓", pages_public.render_pickleball_monitor),
 ]
@@ -158,7 +157,7 @@ def main():
         st.markdown(_intro_overlay_html(), unsafe_allow_html=True)
 
     if "current_page" not in st.session_state:
-        st.session_state["current_page"] = "Home"
+        st.session_state["current_page"] = "Badminton"
 
     available = dict((label, fn) for label, _, fn in VIEWER_PAGES)
     if auth.is_admin():
@@ -166,12 +165,12 @@ def main():
     if auth.is_scorer():
         available.update((label, fn) for label, _, fn in UMPIRE_PAGES)
 
-    # Bounce back to Home if the current page no longer exists — either the
-    # admin logged out while on an admin-only page, or (as with the removed
-    # Schedule & Settings page) a page was retired while someone's session
-    # still pointed at it.
+    # Bounce back to the default viewer page if the current page no longer
+    # exists — either the admin logged out while on an admin-only page, or
+    # (as with the removed Schedule & Settings and Home pages) a page was
+    # retired while someone's session still pointed at it.
     if st.session_state["current_page"] not in available:
-        st.session_state["current_page"] = "Home"
+        st.session_state["current_page"] = "Badminton"
 
     with st.sidebar:
         st.markdown(
