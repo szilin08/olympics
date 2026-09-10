@@ -135,6 +135,24 @@ def _intro_overlay_html():
 
 
 def main():
+    kiosk = st.query_params.get("kiosk")
+    if kiosk in ("badminton", "pickleball"):
+        # A bare, chrome-free page meant to be opened on its own — e.g. on
+        # a projector or a dedicated kiosk laptop — instead of navigating
+        # to the Live Monitor tab inside the full app. There's no sidebar
+        # or header rendered here at all, so there's no Streamlit chrome
+        # for the in-page "Full Screen" button's refresh cycle to ever
+        # expose again; and because this page never builds any of that
+        # chrome in the first place, the browser's OWN fullscreen (F11) can
+        # be used on the tab and it'll stay clean through every refresh,
+        # since browser-level fullscreen isn't tied to any on-page element
+        # the way the JS Fullscreen API is.
+        if kiosk == "badminton":
+            pages_public.render_badminton_kiosk()
+        else:
+            pages_public.render_pickleball_kiosk()
+        return
+
     if "intro_played" not in st.session_state:
         st.session_state["intro_played"] = True
         st.markdown(_intro_overlay_html(), unsafe_allow_html=True)
