@@ -488,13 +488,16 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
       }}, 1000);
     </script>
     <style>
-      /* Jumbotron mode: vertically centered, warm gradient backdrop, and
-         everything scaled up via !important since the per-cell sizes were
-         set inline in Python for the normal (embedded) monitor view. */
+      /* Jumbotron mode: pinned to the TOP (not vertically centered — with
+         only a couple of live matches that left a big empty gap above the
+         content instead of below it, which read as "the top is missing"),
+         warm gradient backdrop, everything scaled up via !important since
+         the per-cell sizes were set inline in Python for the normal
+         (embedded) monitor view. */
       #bd-live-now.bd-fs {{
         display: flex !important;
         flex-direction: column !important;
-        justify-content: center !important;
+        justify-content: flex-start !important;
         min-height: 100vh !important;
         padding: 48px 64px !important;
         background: radial-gradient(circle at 50% 10%, #1c1a14 0%, #0a0a08 65%) !important;
@@ -1052,10 +1055,11 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
       }}, 1000);
     </script>
     <style>
+      /* Pinned to the top — see the matching comment on #bd-live-now.bd-fs. */
       #pk-live-now.pk-fs {{
         display: flex !important;
         flex-direction: column !important;
-        justify-content: center !important;
+        justify-content: flex-start !important;
         min-height: 100vh !important;
         padding: 48px 64px !important;
         background: radial-gradient(circle at 50% 10%, #1c1a14 0%, #0a0a08 65%) !important;
