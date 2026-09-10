@@ -634,7 +634,7 @@ def _live_autorefresh_wait(interval):
 
 
 def render_badminton_monitor():
-    ui.page_header("Home / Badminton", "Badminton — Live Monitor",
+    ui.page_header("Badminton", "Badminton — Live Monitor",
                     "16 departments · Double elimination · First to 3 category wins", "Live", "green")
     bd = state.load_bd()
     champ = logic.bd_champion(bd)
@@ -1131,7 +1131,7 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
 
 
 def render_pickleball_monitor():
-    ui.page_header("Home / Pickleball", "Pickleball — Live Monitor",
+    ui.page_header("Pickleball", "Pickleball — Live Monitor",
                     "22 pairs · 4 groups · Top 4 advance · Mixed doubles", "Live", "green")
     pk = state.load_pk()
     champ = logic.pk_champion(pk)
