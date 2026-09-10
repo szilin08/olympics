@@ -219,13 +219,13 @@ def render_badminton_umpire():
 
 def _render_badminton_scoring(editable_structure: bool):
     if editable_structure:
-        ui.page_header("Home / Badminton", "Badminton — Admin",
+        ui.page_header("Badminton", "Badminton — Admin",
                         "16 departments · Double elimination · First to 3 category wins · 15 pts (21 from semis)",
                         "Admin mode", "navy")
         _render_backup_restore_panel("bd")
         _render_routing_repair_panel()
     else:
-        ui.page_header("Home / Badminton", "Badminton — Umpiring",
+        ui.page_header("Badminton", "Badminton — Umpiring",
                         "Double elimination · First to 3 category wins · 15 pts (21 from semis)",
                         "Umpire mode", "gold")
         st.caption("👀 You can enter and adjust scores. Team names and bracket resets are locked to admins.")
@@ -481,12 +481,12 @@ def render_pickleball_umpire():
 
 def _render_pickleball_scoring(editable_structure: bool):
     if editable_structure:
-        ui.page_header("Home / Pickleball", "Pickleball — Admin",
+        ui.page_header("Pickleball", "Pickleball — Admin",
                         "22 pairs · 4 groups · Top 4 per group advance · Mixed doubles · Best of 3 to 15 pts",
                         "Admin mode", "navy")
         _render_backup_restore_panel("pk")
     else:
-        ui.page_header("Home / Pickleball", "Pickleball — Umpiring",
+        ui.page_header("Pickleball", "Pickleball — Umpiring",
                         "4 groups · Top 4 per group advance · Mixed doubles · Best of 3 to 15 pts",
                         "Umpire mode", "gold")
         st.caption("👀 You can enter and adjust scores. Pair names, group setup, and resets are locked to admins.")
@@ -617,7 +617,7 @@ def _render_pickleball_scoring(editable_structure: bool):
 
 def render_settings():
     auth.require_admin()
-    ui.page_header("Home / Settings", "Schedule & Settings",
+    ui.page_header("Settings", "Schedule & Settings",
                     "Round dates, password setup, and the recent-activity audit log", "Admin mode", "navy")
 
     sched = state.load_schedule()
