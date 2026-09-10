@@ -459,21 +459,42 @@ def _render_bd_monitor_html(bd, rounds):
         if (hero) hero.style.display = active ? 'block' : 'none';
       }}
       function bdToggleFullscreen() {{
-        var el = document.getElementById('bd-live-now');
-        if (!document.fullscreenElement && !document.webkitFullscreenElement) {{
-          if (el.requestFullscreen) {{ el.requestFullscreen(); }}
-          else if (el.webkitRequestFullscreen) {{ el.webkitRequestFullscreen(); }}
+        // Fullscreen the WHOLE top-level tab (not just this element) —
+        // this widget lives inside a components.html iframe that gets a
+        // brand-new srcdoc every time the auto-refresh timer fires, and an
+        // element that gets destroyed/recreated can't stay the fullscreen
+        // element. document.documentElement on the top window is never
+        // torn down by a Streamlit rerun, so fullscreen survives refreshes.
+        // theme.py hides the surrounding Streamlit chrome (sidebar/header)
+        // via the 'lbs-kiosk' body class toggled below, so it still reads
+        // as a clean scoreboard rather than the full dashboard UI.
+        var topDoc = window.top.document;
+        if (!topDoc.fullscreenElement && !topDoc.webkitFullscreenElement) {{
+          var target = topDoc.documentElement;
+          if (target.requestFullscreen) {{ target.requestFullscreen(); }}
+          else if (target.webkitRequestFullscreen) {{ target.webkitRequestFullscreen(); }}
         }} else {{
-          if (document.exitFullscreen) {{ document.exitFullscreen(); }}
-          else if (document.webkitExitFullscreen) {{ document.webkitExitFullscreen(); }}
+          if (topDoc.exitFullscreen) {{ topDoc.exitFullscreen(); }}
+          else if (topDoc.webkitExitFullscreen) {{ topDoc.webkitExitFullscreen(); }}
         }}
       }}
-      document.addEventListener('fullscreenchange', function() {{
-        bdSetFsUi(!!document.fullscreenElement);
-      }});
-      document.addEventListener('webkitfullscreenchange', function() {{
-        bdSetFsUi(!!document.webkitFullscreenElement);
-      }});
+      (function() {{
+        var topDoc = window.top.document;
+        function onFsChange() {{
+          var active = !!(topDoc.fullscreenElement || topDoc.webkitFullscreenElement);
+          topDoc.body.classList.toggle('lbs-kiosk', active);
+          bdSetFsUi(active);
+        }}
+        topDoc.addEventListener('fullscreenchange', onFsChange);
+        topDoc.addEventListener('webkitfullscreenchange', onFsChange);
+        // Re-sync immediately on load — if the tab was already fullscreen
+        // from before this auto-refresh cycle, this iframe's own UI (the
+        // jumbotron styling, "Exit Full Screen" label) needs to catch up
+        // to that pre-existing state right away rather than waiting for
+        // the next fullscreenchange event, which won't fire again since
+        // fullscreen never actually toggled off.
+        onFsChange();
+      }})();
       setInterval(function() {{
         var dt = document.getElementById('bd-fs-datetime');
         if (dt && dt.closest('#bd-live-now').classList.contains('bd-fs')) {{
@@ -1016,21 +1037,32 @@ def _render_pk_monitor_html(pk, rounds):
         if (hero) hero.style.display = active ? 'block' : 'none';
       }}
       function pkToggleFullscreen() {{
-        var el = document.getElementById('pk-live-now');
-        if (!document.fullscreenElement && !document.webkitFullscreenElement) {{
-          if (el.requestFullscreen) {{ el.requestFullscreen(); }}
-          else if (el.webkitRequestFullscreen) {{ el.webkitRequestFullscreen(); }}
+        // See bdToggleFullscreen's comment (badminton monitor) — same fix:
+        // fullscreen the top-level tab, not this element, since this
+        // widget's iframe gets a fresh srcdoc every auto-refresh cycle.
+        var topDoc = window.top.document;
+        if (!topDoc.fullscreenElement && !topDoc.webkitFullscreenElement) {{
+          var target = topDoc.documentElement;
+          if (target.requestFullscreen) {{ target.requestFullscreen(); }}
+          else if (target.webkitRequestFullscreen) {{ target.webkitRequestFullscreen(); }}
         }} else {{
-          if (document.exitFullscreen) {{ document.exitFullscreen(); }}
-          else if (document.webkitExitFullscreen) {{ document.webkitExitFullscreen(); }}
+          if (topDoc.exitFullscreen) {{ topDoc.exitFullscreen(); }}
+          else if (topDoc.webkitExitFullscreen) {{ topDoc.webkitExitFullscreen(); }}
         }}
       }}
-      document.addEventListener('fullscreenchange', function() {{
-        pkSetFsUi(!!document.fullscreenElement);
-      }});
-      document.addEventListener('webkitfullscreenchange', function() {{
-        pkSetFsUi(!!document.webkitFullscreenElement);
-      }});
+      (function() {{
+        var topDoc = window.top.document;
+        function onFsChange() {{
+          var active = !!(topDoc.fullscreenElement || topDoc.webkitFullscreenElement);
+          topDoc.body.classList.toggle('lbs-kiosk', active);
+          pkSetFsUi(active);
+        }}
+        topDoc.addEventListener('fullscreenchange', onFsChange);
+        topDoc.addEventListener('webkitfullscreenchange', onFsChange);
+        // Re-sync immediately in case the tab was already fullscreen from
+        // before this auto-refresh cycle reloaded this iframe.
+        onFsChange();
+      }})();
       setInterval(function() {{
         var dt = document.getElementById('pk-fs-datetime');
         if (dt && dt.closest('#pk-live-now').classList.contains('pk-fs')) {{
