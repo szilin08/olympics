@@ -346,7 +346,7 @@ def _bd_mon_tile_html(tie, big=False):
     """
 
 
-def _render_bd_monitor_html(bd, rounds):
+def _render_bd_monitor_html(bd, rounds, live_only=False):
     live = [t for t in bd["ties"].values() if _bd_tie_status(t) == "live" and t["id"].split("_")[0] in rounds]
     if live:
         # Only spotlight-treat a SINGLE live tie as a full-width "big" jumbo
@@ -378,7 +378,7 @@ def _render_bd_monitor_html(bd, rounds):
 
     sections = ""
     for r in logic.ALL_BD_ROUNDS:
-        if r not in rounds:
+        if live_only or r not in rounds:
             continue
         ties = [t for tid, t in bd["ties"].items() if tid.split("_")[0] == r]
         if not ties:
@@ -407,6 +407,11 @@ def _render_bd_monitor_html(bd, rounds):
     # override the inline per-cell font-sizes set by Python — the jumbotron
     # look needs everything bigger and centered, which inline styles alone
     # can't be overridden by without !important.
+    overview_html = "" if live_only else f"""
+      <div style="color:#8a877d;font-size:11px;text-transform:uppercase;letter-spacing:.08em;
+                  font-family:'DM Mono',monospace;margin-bottom:12px">Tournament Overview</div>
+      {sections}
+    """
     return f"""
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <div style="color-scheme:dark;background:#111110;padding:20px;border-radius:12px;font-family:'Inter',sans-serif;min-height:850px">
@@ -443,9 +448,7 @@ def _render_bd_monitor_html(bd, rounds):
           {live_section}
         </div>
       </div>
-      <div style="color:#8a877d;font-size:11px;text-transform:uppercase;letter-spacing:.08em;
-                  font-family:'DM Mono',monospace;margin-bottom:12px">Tournament Overview</div>
-      {sections}
+      {overview_html}
     </div>
     <script>
       function bdSetFsUi(active) {{
@@ -890,7 +893,7 @@ def _pk_group_standings_html(pk):
     return f'<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px">{cards}</div>'
 
 
-def _render_pk_monitor_html(pk, rounds):
+def _render_pk_monitor_html(pk, rounds, live_only=False):
     show_group = "GROUP" in rounds
     live = []
 
@@ -938,7 +941,7 @@ def _render_pk_monitor_html(pk, rounds):
         live_section = '<div style="color:#8a877d;font-size:13px;margin-bottom:22px">No matches currently in progress.</div>'
 
     sections = ""
-    if show_group:
+    if show_group and not live_only:
         sections += f"""
         <div style="margin-bottom:20px">
           <div style="font-size:11px;color:#8a877d;text-transform:uppercase;letter-spacing:.08em;
@@ -948,7 +951,7 @@ def _render_pk_monitor_html(pk, rounds):
         """
 
     for r in ["K1", "K2", "K3", "GF"]:
-        if r not in rounds:
+        if live_only or r not in rounds:
             continue
         ids = [tid for tid in pk["ko"] if (tid.startswith(r + "_") or (r == "GF" and tid == "GF"))]
         if not ids:
@@ -968,6 +971,11 @@ def _render_pk_monitor_html(pk, rounds):
         </div>
         """
 
+    overview_html = "" if live_only else f"""
+      <div style="color:#8a877d;font-size:11px;text-transform:uppercase;letter-spacing:.08em;
+                  font-family:'DM Mono',monospace;margin-bottom:12px">Tournament Overview</div>
+      {sections}
+    """
     return f"""
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <div style="color-scheme:dark;background:#111110;padding:20px;border-radius:12px;font-family:'Inter',sans-serif;min-height:850px">
@@ -1004,9 +1012,7 @@ def _render_pk_monitor_html(pk, rounds):
           {live_section}
         </div>
       </div>
-      <div style="color:#8a877d;font-size:11px;text-transform:uppercase;letter-spacing:.08em;
-                  font-family:'DM Mono',monospace;margin-bottom:12px">Tournament Overview</div>
-      {sections}
+      {overview_html}
     </div>
     <script>
       function pkSetFsUi(active) {{
@@ -1180,11 +1186,11 @@ def _render_kiosk_page(sport):
     )
     if sport == "bd":
         bd = state.load_bd()
-        html = _render_bd_monitor_html(bd, logic.ALL_BD_ROUNDS)
+        html = _render_bd_monitor_html(bd, logic.ALL_BD_ROUNDS, live_only=True)
     else:
         pk = state.load_pk()
-        html = _render_pk_monitor_html(pk, logic.ALL_PK_ROUNDS)
-    components.html(html, height=1000, scrolling=True)
+        html = _render_pk_monitor_html(pk, logic.ALL_PK_ROUNDS, live_only=True)
+    components.html(html, height=700, scrolling=True)
     time.sleep(15)
     st.rerun()
 
