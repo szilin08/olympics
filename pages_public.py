@@ -435,7 +435,7 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
             </button>
           </div>
         </div>
-        <div class="bd-fs-hero" style="display:none;text-align:center;margin:6px 0 30px">
+        <div class="bd-fs-hero" style="display:block;text-align:center;margin:6px 0 30px">
           <div style="font-size:13px;font-weight:800;letter-spacing:.16em;color:#8a877d;text-transform:uppercase;
                       font-family:'DM Mono',monospace;margin-bottom:10px">LBS × MGB Sports Tournament</div>
           <div style="font-size:46px;font-weight:800;color:#fff;letter-spacing:-0.01em;line-height:1.1">
@@ -458,8 +458,8 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
         if (btn) btn.innerHTML = active ? '⛶ Exit Full Screen' : '⛶ Full Screen';
         var brand = document.querySelectorAll('.bd-fs-brand');
         for (var i = 0; i < brand.length; i++) brand[i].style.display = active ? 'inline' : 'none';
-        var hero = document.querySelector('.bd-fs-hero');
-        if (hero) hero.style.display = active ? 'block' : 'none';
+        // Header (title/date banner) now always shows, in or out of
+        // fullscreen — it used to be hidden until Full Screen was pressed.
       }}
       function bdToggleFullscreen() {{
         var el = document.getElementById('bd-live-now');
@@ -479,7 +479,7 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
       }});
       setInterval(function() {{
         var dt = document.getElementById('bd-fs-datetime');
-        if (dt && dt.closest('#bd-live-now').classList.contains('bd-fs')) {{
+        if (dt) {{
           var now = new Date();
           var dateStr = now.toLocaleDateString([], {{weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'}});
           var timeStr = now.toLocaleTimeString([], {{hour: '2-digit', minute: '2-digit', second: '2-digit'}});
@@ -1002,7 +1002,7 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
             </button>
           </div>
         </div>
-        <div class="pk-fs-hero" style="display:none;text-align:center;margin:6px 0 30px">
+        <div class="pk-fs-hero" style="display:block;text-align:center;margin:6px 0 30px">
           <div style="font-size:13px;font-weight:800;letter-spacing:.16em;color:#8a877d;text-transform:uppercase;
                       font-family:'DM Mono',monospace;margin-bottom:10px">LBS × MGB Sports Tournament</div>
           <div style="font-size:46px;font-weight:800;color:#fff;letter-spacing:-0.01em;line-height:1.1">
@@ -1025,8 +1025,8 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
         if (btn) btn.innerHTML = active ? '⛶ Exit Full Screen' : '⛶ Full Screen';
         var brand = document.querySelectorAll('.pk-fs-brand');
         for (var i = 0; i < brand.length; i++) brand[i].style.display = active ? 'inline' : 'none';
-        var hero = document.querySelector('.pk-fs-hero');
-        if (hero) hero.style.display = active ? 'block' : 'none';
+        // Header (title/date banner) now always shows, in or out of
+        // fullscreen — it used to be hidden until Full Screen was pressed.
       }}
       function pkToggleFullscreen() {{
         var el = document.getElementById('pk-live-now');
@@ -1046,7 +1046,7 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
       }});
       setInterval(function() {{
         var dt = document.getElementById('pk-fs-datetime');
-        if (dt && dt.closest('#pk-live-now').classList.contains('pk-fs')) {{
+        if (dt) {{
           var now = new Date();
           var dateStr = now.toLocaleDateString([], {{weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'}});
           var timeStr = now.toLocaleTimeString([], {{hour: '2-digit', minute: '2-digit', second: '2-digit'}});
