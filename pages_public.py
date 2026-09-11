@@ -306,11 +306,11 @@ def _bd_mon_tile_html(tie, big=False):
         {badge}
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:{name_size};font-weight:{t1_weight};color:{t1_color}">
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:8px">{t1}</span>
+        <span class="mon-team-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:8px">{t1}</span>
         <span style="font-family:'DM Mono',monospace;font-size:{score_size};font-weight:800;flex-shrink:0">{w1}</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:{name_size};font-weight:{t2_weight};color:{t2_color}">
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:8px">{t2}</span>
+        <span class="mon-team-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:8px">{t2}</span>
         <span style="font-family:'DM Mono',monospace;font-size:{score_size};font-weight:800;flex-shrink:0">{w2}</span>
       </div>
       {activity_line}
@@ -564,6 +564,17 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
          the column width and every font/padding size together as the count
          goes up, so a handful of ties still read big from across the room
          while a busy multi-court session still fits on one screen. */
+      /* Full team names, never truncated with an ellipsis, at any tier —
+         a name like "Muhammad Afenddy & Nu..." cut off mid-word wasn't
+         readable from a distance. Letting it wrap onto a second line
+         instead (rather than the single-line ellipsis truncation used in
+         the normal, non-jumbo embedded view) makes the tile a bit taller
+         but keeps the whole name visible. */
+      #bd-live-now.bd-fs .bd-fs-multi .mon-team-name {{
+        white-space: normal !important; overflow: visible !important;
+        text-overflow: unset !important; word-break: break-word !important;
+        line-height: 1.15 !important;
+      }}
       #bd-live-now.bd-fs .bd-fs-multi-lg {{ grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important; gap: 14px !important; }}
       #bd-live-now.bd-fs .bd-fs-multi-lg table th {{ font-size: 17px !important; padding: 8px 14px !important; }}
       #bd-live-now.bd-fs .bd-fs-multi-lg table td {{ font-size: 26px !important; padding: 10px 14px !important; }}
@@ -862,11 +873,11 @@ def _pk_mon_tile_html(d, big=False):
         {badge}
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:{name_size};font-weight:{t1_weight};color:{t1_color}">
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:8px">{t1}</span>
+        <span class="mon-team-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:8px">{t1}</span>
         <span style="font-family:'DM Mono',monospace;font-size:{score_size};font-weight:800;flex-shrink:0">{w1}</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:{name_size};font-weight:{t2_weight};color:{t2_color}">
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:8px">{t2}</span>
+        <span class="mon-team-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:8px">{t2}</span>
         <span style="font-family:'DM Mono',monospace;font-size:{score_size};font-weight:800;flex-shrink:0">{w2}</span>
       </div>
       {activity_line}
@@ -1140,6 +1151,12 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
          many matches are actually live right now — see
          _render_pk_monitor_html) shrink the column width and every
          font/padding size together as the live count goes up. */
+      /* Same as the badminton monitor — see that comment. */
+      #pk-live-now.pk-fs .pk-fs-multi .mon-team-name {{
+        white-space: normal !important; overflow: visible !important;
+        text-overflow: unset !important; word-break: break-word !important;
+        line-height: 1.15 !important;
+      }}
       #pk-live-now.pk-fs .pk-fs-multi-lg {{ grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important; gap: 14px !important; }}
       #pk-live-now.pk-fs .pk-fs-multi-lg table th {{ font-size: 17px !important; padding: 8px 14px !important; }}
       #pk-live-now.pk-fs .pk-fs-multi-lg table td {{ font-size: 26px !important; padding: 10px 14px !important; }}
