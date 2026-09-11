@@ -365,7 +365,8 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
         # container width, so it can't produce the same overflow-past-the-
         # viewport squeeze flexbox did on narrow/mobile widths.
         if len(live) == 1:
-            tiles = f'<div style="width:100%;max-width:520px">{_bd_mon_tile_html(live[0], big=True)}</div>'
+            spotlight_width = "900px" if live_only else "520px"
+            tiles = f'<div style="width:100%;max-width:{spotlight_width}">{_bd_mon_tile_html(live[0], big=True)}</div>'
             live_section = f'<div style="margin-bottom:22px">{tiles}</div>'
         else:
             tiles = "".join(_bd_mon_tile_html(t) for t in live)
@@ -936,7 +937,8 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
         # overflow each card's edge and the score table to get clipped so
         # only a sliver (often just the last game's column) stayed visible.
         if len(live) == 1:
-            tiles = f'<div style="width:100%;max-width:520px">{_pk_mon_tile_html(live[0], big=True)}</div>'
+            spotlight_width = "900px" if live_only else "520px"
+            tiles = f'<div style="width:100%;max-width:{spotlight_width}">{_pk_mon_tile_html(live[0], big=True)}</div>'
             live_section = f'<div style="margin-bottom:22px">{tiles}</div>'
         else:
             tiles = "".join(_pk_mon_tile_html(d) for d in live)
