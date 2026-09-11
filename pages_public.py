@@ -369,9 +369,19 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
             tiles = f'<div style="width:100%;max-width:{spotlight_width}">{_bd_mon_tile_html(live[0], big=True)}</div>'
             live_section = f'<div style="margin-bottom:22px">{tiles}</div>'
         else:
+            # More matches live at once means less room per tile — a fixed
+            # "big" font size that looked right for 2-3 simultaneous ties
+            # ran 6+ of them off the bottom of the screen entirely. Scale
+            # the tile size DOWN as the live count goes up so a busy
+            # multi-court session still lands on one screen without
+            # scrolling, instead of every tile always claiming the same
+            # amount of space regardless of how many need to fit.
+            n = len(live)
+            tier = "lg" if n <= 3 else ("md" if n <= 6 else "sm")
             tiles = "".join(_bd_mon_tile_html(t) for t in live)
             live_section = (
-                '<div class="bd-fs-multi" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));'
+                f'<div class="bd-fs-multi bd-fs-multi-{tier}" style="display:grid;'
+                'grid-template-columns:repeat(auto-fit,minmax(230px,1fr));'
                 f'gap:12px;margin-bottom:22px">{tiles}</div>'
             )
     else:
@@ -546,27 +556,39 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
          above and give the multi-tile grid its own, much more modest sizing
          instead of inheriting single-card jumbo sizing wholesale.
 
-         Auto-fit instead of a fixed column count: with only a couple of
-         matches live (the common case), forcing exactly 4 columns left 2
-         of those columns empty and shrank the live cards down to a
-         quarter-width sliver instead of letting them fill the space. A
-         generous minmax (380px) still caps out around 4-5 per row on a
-         real widescreen display, but lets 1-3 live matches actually use
-         the available width instead of stranding it as empty grid cells. */
-      #bd-live-now.bd-fs .bd-fs-multi {{
-        grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important;
+         Three size tiers instead of one fixed size: a fixed "big" tile size
+         that looked right for 2-3 simultaneous ties ran a busy 7+-live
+         session well past the bottom of the screen, needing a scroll to see
+         everything at once. -lg/-md/-sm (picked in Python by how many ties
+         are actually live right now — see _render_bd_monitor_html) shrink
+         the column width and every font/padding size together as the count
+         goes up, so a handful of ties still read big from across the room
+         while a busy multi-court session still fits on one screen. */
+      #bd-live-now.bd-fs .bd-fs-multi-lg {{ grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important; gap: 14px !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-lg table th {{ font-size: 17px !important; padding: 8px 14px !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-lg table td {{ font-size: 26px !important; padding: 10px 14px !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-lg table td.bd-name-cell {{ font-size: 30px !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-lg table td.bd-tally-cell {{ font-size: 30px !important; color: #d99a2b !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-lg [style*="min-width:200px"] {{
+        border-radius: 10px !important; padding: 20px !important; box-shadow: 0 8px 24px rgba(0,0,0,.4) !important;
       }}
-      #bd-live-now.bd-fs .bd-fs-multi table th {{
-        font-size: 17px !important; padding: 8px 14px !important;
+
+      #bd-live-now.bd-fs .bd-fs-multi-md {{ grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important; gap: 10px !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-md table th {{ font-size: 13px !important; padding: 5px 10px !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-md table td {{ font-size: 18px !important; padding: 6px 10px !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-md table td.bd-name-cell {{ font-size: 20px !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-md table td.bd-tally-cell {{ font-size: 20px !important; color: #d99a2b !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-md [style*="min-width:200px"] {{
+        border-radius: 9px !important; padding: 13px !important; box-shadow: 0 6px 18px rgba(0,0,0,.4) !important;
       }}
-      #bd-live-now.bd-fs .bd-fs-multi table td {{
-        font-size: 26px !important; padding: 10px 14px !important;
-      }}
-      #bd-live-now.bd-fs .bd-fs-multi table td.bd-name-cell {{ font-size: 30px !important; }}
-      #bd-live-now.bd-fs .bd-fs-multi table td.bd-tally-cell {{ font-size: 30px !important; color: #d99a2b !important; }}
-      #bd-live-now.bd-fs .bd-fs-multi [style*="min-width:200px"] {{
-        border-radius: 10px !important; padding: 20px !important;
-        box-shadow: 0 8px 24px rgba(0,0,0,.4) !important;
+
+      #bd-live-now.bd-fs .bd-fs-multi-sm {{ grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)) !important; gap: 8px !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-sm table th {{ font-size: 10px !important; padding: 3px 7px !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-sm table td {{ font-size: 13px !important; padding: 4px 7px !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-sm table td.bd-name-cell {{ font-size: 14px !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-sm table td.bd-tally-cell {{ font-size: 14px !important; color: #d99a2b !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-sm [style*="min-width:200px"] {{
+        border-radius: 7px !important; padding: 8px !important; box-shadow: 0 4px 12px rgba(0,0,0,.4) !important;
       }}
       #bd-live-now:fullscreen {{ background: #0a0a08; }}
       #bd-live-now:-webkit-full-screen {{ background: #0a0a08; }}
@@ -941,9 +963,16 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
             tiles = f'<div style="width:100%;max-width:{spotlight_width}">{_pk_mon_tile_html(live[0], big=True)}</div>'
             live_section = f'<div style="margin-bottom:22px">{tiles}</div>'
         else:
+            # Same fix as the badminton monitor: scale tile size down as the
+            # live count goes up — pickleball routinely has matches running
+            # in all 4 groups at once, and a fixed "big" tile size for that
+            # many tiles ran well past the bottom of the screen.
+            n = len(live)
+            tier = "lg" if n <= 3 else ("md" if n <= 6 else "sm")
             tiles = "".join(_pk_mon_tile_html(d) for d in live)
             live_section = (
-                '<div class="pk-fs-multi" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));'
+                f'<div class="pk-fs-multi pk-fs-multi-{tier}" style="display:grid;'
+                'grid-template-columns:repeat(auto-fit,minmax(230px,1fr));'
                 f'gap:12px;margin-bottom:22px">{tiles}</div>'
             )
     else:
@@ -1098,29 +1127,44 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
       /* Same fix as the badminton monitor: the jumbo sizing above assumes
          ONE full-width spotlight card. With several matches live at once
          we switch to a multi-column grid of compact tiles instead, and
-         these higher-specificity overrides (scoped under .pk-fs-multi)
+         these higher-specificity overrides (scoped under .pk-fs-multi-*)
          give that grid its own modest sizing instead of inheriting the
          single-card jumbo fonts/padding, which was dwarfing every tile's
          numbers and only leaving room for a couple of columns per row.
 
-         Auto-fit instead of a fixed column count — see the matching
-         comment on .bd-fs-multi: with only 1-3 matches live (the common
-         case) a fixed 4-column grid stranded empty columns instead of
-         letting those tiles fill the width. */
-      #pk-live-now.pk-fs .pk-fs-multi {{
-        grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important;
+         Three size tiers instead of one fixed size — see the matching
+         comment on .bd-fs-multi-*: pickleball routinely has matches live
+         in all 4 groups plus knockout ties at once, and a fixed "big" tile
+         size that suited 2-3 live matches ran a busy 7+-live session well
+         past the bottom of the screen. -lg/-md/-sm (picked in Python by how
+         many matches are actually live right now — see
+         _render_pk_monitor_html) shrink the column width and every
+         font/padding size together as the live count goes up. */
+      #pk-live-now.pk-fs .pk-fs-multi-lg {{ grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important; gap: 14px !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-lg table th {{ font-size: 17px !important; padding: 8px 14px !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-lg table td {{ font-size: 26px !important; padding: 10px 14px !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-lg table td.pk-name-cell {{ font-size: 30px !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-lg table td.pk-tally-cell {{ font-size: 30px !important; color: #d99a2b !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-lg [style*="min-width:200px"] {{
+        border-radius: 10px !important; padding: 20px !important; box-shadow: 0 8px 24px rgba(0,0,0,.4) !important;
       }}
-      #pk-live-now.pk-fs .pk-fs-multi table th {{
-        font-size: 17px !important; padding: 8px 14px !important;
+
+      #pk-live-now.pk-fs .pk-fs-multi-md {{ grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important; gap: 10px !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-md table th {{ font-size: 13px !important; padding: 5px 10px !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-md table td {{ font-size: 18px !important; padding: 6px 10px !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-md table td.pk-name-cell {{ font-size: 20px !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-md table td.pk-tally-cell {{ font-size: 20px !important; color: #d99a2b !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-md [style*="min-width:200px"] {{
+        border-radius: 9px !important; padding: 13px !important; box-shadow: 0 6px 18px rgba(0,0,0,.4) !important;
       }}
-      #pk-live-now.pk-fs .pk-fs-multi table td {{
-        font-size: 26px !important; padding: 10px 14px !important;
-      }}
-      #pk-live-now.pk-fs .pk-fs-multi table td.pk-name-cell {{ font-size: 30px !important; }}
-      #pk-live-now.pk-fs .pk-fs-multi table td.pk-tally-cell {{ font-size: 30px !important; color: #d99a2b !important; }}
-      #pk-live-now.pk-fs .pk-fs-multi [style*="min-width:200px"] {{
-        border-radius: 10px !important; padding: 20px !important;
-        box-shadow: 0 8px 24px rgba(0,0,0,.4) !important;
+
+      #pk-live-now.pk-fs .pk-fs-multi-sm {{ grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)) !important; gap: 8px !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-sm table th {{ font-size: 10px !important; padding: 3px 7px !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-sm table td {{ font-size: 13px !important; padding: 4px 7px !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-sm table td.pk-name-cell {{ font-size: 14px !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-sm table td.pk-tally-cell {{ font-size: 14px !important; color: #d99a2b !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-sm [style*="min-width:200px"] {{
+        border-radius: 7px !important; padding: 8px !important; box-shadow: 0 4px 12px rgba(0,0,0,.4) !important;
       }}
       #pk-live-now:fullscreen {{ background: #0a0a08; }}
       #pk-live-now:-webkit-full-screen {{ background: #0a0a08; }}
