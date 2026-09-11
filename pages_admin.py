@@ -492,19 +492,41 @@ def _render_pickleball_scoring(editable_structure: bool):
         st.caption("👀 You can enter and adjust scores. Pair names, group setup, and resets are locked to admins.")
 
     if editable_structure:
-        top1, top2 = st.columns([3, 1])
-        with top2:
-            if st.button("↺ Reset everything", use_container_width=True):
-                st.session_state["confirm_pk_reset"] = True
-            if st.session_state.get("confirm_pk_reset"):
-                st.warning("This clears **all** pairs, groups and scores. This cannot be undone.")
+        with st.expander("↺ Reset options", expanded=False):
+            r1, r2, r3 = st.columns(3)
+            with r1:
+                st.button("Reset group scores", use_container_width=True,
+                          help="Clears every group-stage match back to 0-0. Keeps pairs/groups and "
+                               "the knockout bracket untouched.",
+                          on_click=lambda: st.session_state.update(confirm_pk_reset="scores"))
+            with r2:
+                st.button("Reset knockout bracket", use_container_width=True,
+                          help="Clears the knockout bracket back to blank (ready for auto-seeding). "
+                               "Keeps pairs/groups and group scores untouched.",
+                          on_click=lambda: st.session_state.update(confirm_pk_reset="ko"))
+            with r3:
+                st.button("Reset everything", use_container_width=True,
+                          help="Clears pairs, groups, scores, AND the knockout bracket — a full wipe.",
+                          on_click=lambda: st.session_state.update(confirm_pk_reset="all"))
+
+            pending = st.session_state.get("confirm_pk_reset")
+            if pending:
+                labels = {"scores": "**all group-stage scores** (pairs/groups and the KO bracket stay as-is)",
+                          "ko": "**the knockout bracket** (pairs/groups and group scores stay as-is)",
+                          "all": "**everything** — pairs, groups, scores, and the KO bracket"}
+                st.warning(f"This clears {labels[pending]}. This cannot be undone.")
                 c1, c2 = st.columns(2)
                 if c1.button("Yes, reset", key="pk_reset_yes", type="primary", use_container_width=True):
-                    state.reset_pk(actor=auth.actor_name())
-                    st.session_state["confirm_pk_reset"] = False
+                    if pending == "scores":
+                        state.reset_pk_scores(actor=auth.actor_name())
+                    elif pending == "ko":
+                        state.reset_pk_knockout(actor=auth.actor_name())
+                    else:
+                        state.reset_pk(actor=auth.actor_name())
+                    st.session_state["confirm_pk_reset"] = None
                     st.rerun()
                 if c2.button("Cancel", key="pk_reset_no", use_container_width=True):
-                    st.session_state["confirm_pk_reset"] = False
+                    st.session_state["confirm_pk_reset"] = None
                     st.rerun()
 
     pk = state.load_pk()
