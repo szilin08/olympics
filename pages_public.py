@@ -42,9 +42,14 @@ def _truncate_name(name, maxlen=22):
     the string itself in Python is a hard guarantee: the table can never be
     forced wider than intended by name length, at any screen size, without
     depending on any particular CSS layout mode holding up.
+
+    maxlen=None disables truncation entirely — used on the projector/kiosk
+    page (live_only), which has room to let a long name wrap onto a second
+    line instead (see the full_name plumbing in the tile/table builders
+    below) rather than ever showing a name with a chunk sheared off.
     Escaped via html.escape since these strings go straight into raw HTML."""
     name = name or ""
-    if len(name) > maxlen:
+    if maxlen is not None and len(name) > maxlen:
         name = name[: maxlen - 1].rstrip() + "…"
     return _html.escape(name)
 
@@ -150,7 +155,7 @@ def _bd_tie_status(tie):
     return "live" if active else "scheduled"
 
 
-def _bd_score_table_html(tie, current_ci, compact=True, show_names=False, show_tally=False):
+def _bd_score_table_html(tie, current_ci, compact=True, show_names=False, show_tally=False, full_name=False):
     """Real scoreboard table: one column-group per category (colspan = number
     of games played/live in that category), one row per team, each cell is
     that team's own point total for that game — e.g. MD1 becomes two columns
@@ -211,9 +216,10 @@ def _bd_score_table_html(tie, current_ci, compact=True, show_names=False, show_t
     def team_row(slot, name, color, weight, tally):
         cells = ""
         if show_names:
+            wrap = "white-space:normal;word-break:break-word;max-width:260px" if full_name else "white-space:nowrap"
             cells += (
                 f'<td class="bd-name-cell" style="padding:{cell_pad};font-size:{name_size};font-weight:800;color:{color};'
-                f'white-space:nowrap;text-align:left">{_truncate_name(name)}</td>'
+                f'{wrap};text-align:left">{_truncate_name(name, maxlen=None if full_name else 22)}</td>'
             )
         for c in cats_info:
             if not c["games"]:
@@ -250,9 +256,10 @@ def _bd_score_table_html(tie, current_ci, compact=True, show_names=False, show_t
     """
 
 
-def _bd_mon_tile_html(tie, big=False):
+def _bd_mon_tile_html(tie, big=False, full_name=False):
     status = _bd_tie_status(tie)
-    t1, t2 = _truncate_name(tie["t1"] or "TBD"), _truncate_name(tie["t2"] or "TBD")
+    t1 = _truncate_name(tie["t1"] or "TBD", maxlen=None if full_name else 22)
+    t2 = _truncate_name(tie["t2"] or "TBD", maxlen=None if full_name else 22)
     w1, w2 = tie["w1"] or 0, tie["w2"] or 0
     border = "1px solid #f59e0b" if status == "live" else ("1px solid #2a2a24" if status != "done" else "1px solid #2f4f3a")
     badge = ('<span style="background:#f59e0b;color:#111;font-size:9px;font-weight:800;padding:2px 6px;'
@@ -315,7 +322,7 @@ def _bd_mon_tile_html(tie, big=False):
                 'text-transform:uppercase;letter-spacing:.04em">⚡ Tie-Breaker decides it</div>'
             )
 
-    cat_strip = _bd_score_table_html(tie, current_ci, compact=True) if status in ("live", "done") else ""
+    cat_strip = _bd_score_table_html(tie, current_ci, compact=True, full_name=full_name) if status in ("live", "done") else ""
 
     header_and_teams = f"""
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -347,7 +354,7 @@ def _bd_mon_tile_html(tie, big=False):
             {badge}
           </div>
         """
-        cat_table = _bd_score_table_html(tie, current_ci, compact=False, show_names=True, show_tally=True)
+        cat_table = _bd_score_table_html(tie, current_ci, compact=False, show_names=True, show_tally=True, full_name=full_name)
         return f"""
         <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px;max-width:100%;overflow-x:auto" class="mon-tile-card">
           {header_row}
@@ -384,7 +391,7 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
         # viewport squeeze flexbox did on narrow/mobile widths.
         if len(live) == 1:
             spotlight_width = "900px" if live_only else "520px"
-            tiles = f'<div style="width:100%;max-width:{spotlight_width}">{_bd_mon_tile_html(live[0], big=True)}</div>'
+            tiles = f'<div style="width:100%;max-width:{spotlight_width}">{_bd_mon_tile_html(live[0], big=True, full_name=live_only)}</div>'
             live_section = f'<div style="margin-bottom:22px">{tiles}</div>'
         else:
             # More matches live at once means less room per tile — a fixed
@@ -397,7 +404,7 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
             n = len(live)
             tier = "lg" if n <= 3 else ("md" if n <= 6 else "sm")
             cols = _balanced_grid_cols(n)
-            tiles = "".join(_bd_mon_tile_html(t) for t in live)
+            tiles = "".join(_bd_mon_tile_html(t, full_name=live_only) for t in live)
             live_section = (
                 f'<div class="bd-fs-multi bd-fs-multi-{tier}" style="display:grid;'
                 f'grid-template-columns:repeat({cols},1fr) !important;'
@@ -752,7 +759,7 @@ def _pk_tally(games):
     return w1, w2
 
 
-def _pk_score_table_html(d, compact=True, show_names=False, show_tally=False):
+def _pk_score_table_html(d, compact=True, show_names=False, show_tally=False, full_name=False):
     """Same real-scoreboard-table approach as the badminton monitor's
     _bd_score_table_html, minus the category grouping — a pickleball match
     is just one best-of-3 game group, so each column is a single game."""
@@ -801,9 +808,10 @@ def _pk_score_table_html(d, compact=True, show_names=False, show_tally=False):
     def team_row(slot, name, color, weight, tally):
         cells = ""
         if show_names:
+            wrap = "white-space:normal;word-break:break-word;max-width:260px" if full_name else "white-space:nowrap"
             cells += (
                 f'<td class="pk-name-cell" style="padding:{cell_pad};font-size:{name_size};font-weight:800;color:{color};'
-                f'white-space:nowrap;text-align:left">{_truncate_name(name)}</td>'
+                f'{wrap};text-align:left">{_truncate_name(name, maxlen=None if full_name else 22)}</td>'
             )
         for idx, (gi, g) in enumerate(games):
             border = "border-left:1px solid #2a2a24;" if idx == 0 else ""
@@ -834,9 +842,10 @@ def _pk_score_table_html(d, compact=True, show_names=False, show_tally=False):
     """
 
 
-def _pk_mon_tile_html(d, big=False):
+def _pk_mon_tile_html(d, big=False, full_name=False):
     status = _pk_status(d)
-    t1, t2 = _truncate_name(d["t1"] or "TBD"), _truncate_name(d["t2"] or "TBD")
+    t1 = _truncate_name(d["t1"] or "TBD", maxlen=None if full_name else 22)
+    t2 = _truncate_name(d["t2"] or "TBD", maxlen=None if full_name else 22)
     w1, w2 = _pk_tally(d["games"])
     border = "1px solid #f59e0b" if status == "live" else ("1px solid #2a2a24" if status != "done" else "1px solid #2f4f3a")
     badge = ('<span style="background:#f59e0b;color:#111;font-size:9px;font-weight:800;padding:2px 6px;'
@@ -883,7 +892,7 @@ def _pk_mon_tile_html(d, big=False):
         </div>
         """
 
-    strip = _pk_score_table_html(d, compact=True) if status in ("live", "done") else ""
+    strip = _pk_score_table_html(d, compact=True, full_name=full_name) if status in ("live", "done") else ""
 
     header_and_teams = f"""
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -910,7 +919,7 @@ def _pk_mon_tile_html(d, big=False):
             {badge}
           </div>
         """
-        table = _pk_score_table_html(d, compact=False, show_names=True, show_tally=True)
+        table = _pk_score_table_html(d, compact=False, show_names=True, show_tally=True, full_name=full_name)
         return f"""
         <div style="background:#1c1c19;border:{border};border-radius:10px;padding:{pad};min-width:200px;max-width:100%;overflow-x:auto" class="mon-tile-card">
           {header_row}
@@ -990,7 +999,7 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
         # only a sliver (often just the last game's column) stayed visible.
         if len(live) == 1:
             spotlight_width = "900px" if live_only else "520px"
-            tiles = f'<div style="width:100%;max-width:{spotlight_width}">{_pk_mon_tile_html(live[0], big=True)}</div>'
+            tiles = f'<div style="width:100%;max-width:{spotlight_width}">{_pk_mon_tile_html(live[0], big=True, full_name=live_only)}</div>'
             live_section = f'<div style="margin-bottom:22px">{tiles}</div>'
         else:
             # Same fix as the badminton monitor: scale tile size down as the
@@ -1000,7 +1009,7 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
             n = len(live)
             tier = "lg" if n <= 3 else ("md" if n <= 6 else "sm")
             cols = _balanced_grid_cols(n)
-            tiles = "".join(_pk_mon_tile_html(d) for d in live)
+            tiles = "".join(_pk_mon_tile_html(d, full_name=live_only) for d in live)
             live_section = (
                 f'<div class="pk-fs-multi pk-fs-multi-{tier}" style="display:grid;'
                 f'grid-template-columns:repeat({cols},1fr) !important;'
