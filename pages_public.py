@@ -10,6 +10,24 @@ import state
 import ui
 
 
+def _balanced_grid_cols(n):
+    """Column count for a grid of n live-match tiles, chosen so the last
+    row isn't left with a single lonely tile stranded by itself — auto-fit
+    packs greedily left-to-right (as many tiles as fit per row), which for
+    something like 7 tiles at a decent tile width gave "6 tiles, then 1"
+    instead of a more even "4, then 3". Starts from a roughly square
+    layout (rows ~= sqrt(n)) and backs off a row at a time whenever that
+    would leave exactly one tile dangling on its own last row."""
+    if n <= 1:
+        return 1
+    rows = max(1, round(n ** 0.5))
+    cols = -(-n // rows)  # ceil division
+    while rows > 1 and n % cols == 1:
+        rows -= 1
+        cols = -(-n // rows)
+    return cols
+
+
 def _truncate_name(name, maxlen=22):
     """Hard-cap a team/pair name's rendered length with an ellipsis.
 
@@ -378,10 +396,11 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
             # amount of space regardless of how many need to fit.
             n = len(live)
             tier = "lg" if n <= 3 else ("md" if n <= 6 else "sm")
+            cols = _balanced_grid_cols(n)
             tiles = "".join(_bd_mon_tile_html(t) for t in live)
             live_section = (
                 f'<div class="bd-fs-multi bd-fs-multi-{tier}" style="display:grid;'
-                'grid-template-columns:repeat(auto-fit,minmax(230px,1fr));'
+                f'grid-template-columns:repeat({cols},1fr) !important;'
                 f'gap:12px;margin-bottom:22px">{tiles}</div>'
             )
     else:
@@ -575,7 +594,7 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
         text-overflow: unset !important; word-break: break-word !important;
         line-height: 1.15 !important;
       }}
-      #bd-live-now.bd-fs .bd-fs-multi-lg {{ grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important; gap: 14px !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-lg {{ gap: 14px !important; }}
       #bd-live-now.bd-fs .bd-fs-multi-lg table th {{ font-size: 17px !important; padding: 8px 14px !important; }}
       #bd-live-now.bd-fs .bd-fs-multi-lg table td {{ font-size: 26px !important; padding: 10px 14px !important; }}
       #bd-live-now.bd-fs .bd-fs-multi-lg table td.bd-name-cell {{ font-size: 30px !important; }}
@@ -584,7 +603,7 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
         border-radius: 10px !important; padding: 20px !important; box-shadow: 0 8px 24px rgba(0,0,0,.4) !important;
       }}
 
-      #bd-live-now.bd-fs .bd-fs-multi-md {{ grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important; gap: 10px !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-md {{ gap: 10px !important; }}
       #bd-live-now.bd-fs .bd-fs-multi-md table th {{ font-size: 13px !important; padding: 5px 10px !important; }}
       #bd-live-now.bd-fs .bd-fs-multi-md table td {{ font-size: 18px !important; padding: 6px 10px !important; }}
       #bd-live-now.bd-fs .bd-fs-multi-md table td.bd-name-cell {{ font-size: 20px !important; }}
@@ -593,7 +612,7 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
         border-radius: 9px !important; padding: 13px !important; box-shadow: 0 6px 18px rgba(0,0,0,.4) !important;
       }}
 
-      #bd-live-now.bd-fs .bd-fs-multi-sm {{ grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)) !important; gap: 8px !important; }}
+      #bd-live-now.bd-fs .bd-fs-multi-sm {{ gap: 8px !important; }}
       #bd-live-now.bd-fs .bd-fs-multi-sm table th {{ font-size: 10px !important; padding: 3px 7px !important; }}
       #bd-live-now.bd-fs .bd-fs-multi-sm table td {{ font-size: 13px !important; padding: 4px 7px !important; }}
       #bd-live-now.bd-fs .bd-fs-multi-sm table td.bd-name-cell {{ font-size: 14px !important; }}
@@ -980,10 +999,11 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
             # many tiles ran well past the bottom of the screen.
             n = len(live)
             tier = "lg" if n <= 3 else ("md" if n <= 6 else "sm")
+            cols = _balanced_grid_cols(n)
             tiles = "".join(_pk_mon_tile_html(d) for d in live)
             live_section = (
                 f'<div class="pk-fs-multi pk-fs-multi-{tier}" style="display:grid;'
-                'grid-template-columns:repeat(auto-fit,minmax(230px,1fr));'
+                f'grid-template-columns:repeat({cols},1fr) !important;'
                 f'gap:12px;margin-bottom:22px">{tiles}</div>'
             )
     else:
@@ -1157,7 +1177,7 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
         text-overflow: unset !important; word-break: break-word !important;
         line-height: 1.15 !important;
       }}
-      #pk-live-now.pk-fs .pk-fs-multi-lg {{ grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important; gap: 14px !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-lg {{ gap: 14px !important; }}
       #pk-live-now.pk-fs .pk-fs-multi-lg table th {{ font-size: 17px !important; padding: 8px 14px !important; }}
       #pk-live-now.pk-fs .pk-fs-multi-lg table td {{ font-size: 26px !important; padding: 10px 14px !important; }}
       #pk-live-now.pk-fs .pk-fs-multi-lg table td.pk-name-cell {{ font-size: 30px !important; }}
@@ -1166,7 +1186,7 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
         border-radius: 10px !important; padding: 20px !important; box-shadow: 0 8px 24px rgba(0,0,0,.4) !important;
       }}
 
-      #pk-live-now.pk-fs .pk-fs-multi-md {{ grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important; gap: 10px !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-md {{ gap: 10px !important; }}
       #pk-live-now.pk-fs .pk-fs-multi-md table th {{ font-size: 13px !important; padding: 5px 10px !important; }}
       #pk-live-now.pk-fs .pk-fs-multi-md table td {{ font-size: 18px !important; padding: 6px 10px !important; }}
       #pk-live-now.pk-fs .pk-fs-multi-md table td.pk-name-cell {{ font-size: 20px !important; }}
@@ -1175,7 +1195,7 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
         border-radius: 9px !important; padding: 13px !important; box-shadow: 0 6px 18px rgba(0,0,0,.4) !important;
       }}
 
-      #pk-live-now.pk-fs .pk-fs-multi-sm {{ grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)) !important; gap: 8px !important; }}
+      #pk-live-now.pk-fs .pk-fs-multi-sm {{ gap: 8px !important; }}
       #pk-live-now.pk-fs .pk-fs-multi-sm table th {{ font-size: 10px !important; padding: 3px 7px !important; }}
       #pk-live-now.pk-fs .pk-fs-multi-sm table td {{ font-size: 13px !important; padding: 4px 7px !important; }}
       #pk-live-now.pk-fs .pk-fs-multi-sm table td.pk-name-cell {{ font-size: 14px !important; }}
