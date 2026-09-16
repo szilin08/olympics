@@ -57,6 +57,52 @@ components.html(
     height=0,
 )
 
+# The sidebar's collapse ("«") / re-expand ("»") arrow is rendered as a
+# Material icon ligature font — a <span data-testid="stIconMaterial"> whose
+# TEXT CONTENT is literally "keyboard_double_arrow_left" or
+# "...right", with its color set by an inline style Streamlit applies
+# directly (not a stylesheet rule), which CSS in theme.py can only beat
+# with a matching selector — and this element's wrapping data-testid has
+# been renamed across Streamlit releases (collapsedControl →
+# stSidebarCollapseButton → stSidebarCollapsedControl and combinations of
+# those), so pinning theme.py's CSS to any one of those names is exactly
+# the kind of thing a version bump silently breaks again. The collapse
+# ("open sidebar") arrow happened to match theme.py's CSS in this app's
+# current Streamlit version, but the re-expand ("collapsed sidebar") arrow
+# didn't — confirmed via the browser's own DevTools inspector, which is
+# how the exact icon text below was found. Matching on that icon text
+# instead of any container's internal name sidesteps needing to guess
+# right about implementation details that keep moving: these two icon
+# names are Google's fixed, stable Material Symbols names, not anything
+# Streamlit-specific that a future release might rename. e.closest('button')
+# finds the actual clickable ancestor regardless of how many wrapper divs
+# sit in between, rather than climbing a fixed number of parent levels
+# (which the Fork-hiding function above deliberately avoids too, per its
+# own comment about overshooting past the intended element).
+components.html(
+    '<script>'
+    'function lbsFixSidebarToggle(){'
+    'var doc=window.top.document;'
+    'doc.querySelectorAll(\'span[data-testid="stIconMaterial"]\').forEach(function(e){'
+    'var t=e.textContent.trim();'
+    'if(t==="keyboard_double_arrow_left"||t==="keyboard_double_arrow_right"){'
+    'e.style.setProperty("color","#ffffff","important");'
+    'var btn=e.closest("button")||e.parentElement;'
+    'if(btn){'
+    'btn.style.setProperty("background","linear-gradient(135deg,#d99a2b,#a97a1e)","important");'
+    'btn.style.setProperty("border","1px solid #a97a1e","important");'
+    'btn.style.setProperty("border-radius","8px","important");'
+    'btn.style.setProperty("box-shadow","0 2px 8px rgba(0,0,0,.35)","important");'
+    'btn.style.setProperty("opacity","1","important");'
+    'btn.style.setProperty("visibility","visible","important");'
+    '}}});'
+    '}'
+    'lbsFixSidebarToggle();'
+    'setInterval(lbsFixSidebarToggle,800);'
+    '</script>',
+    height=0,
+)
+
 VIEWER_PAGES = [
     ("Badminton", "🏸", pages_public.render_badminton_monitor),
     ("Pickleball", "🏓", pages_public.render_pickleball_monitor),
