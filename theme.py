@@ -391,6 +391,34 @@ def inject_css():
         }}
         [data-testid="stDialog"] .stButton button:disabled {{ opacity: .4 !important; }}
 
+        /* Same root cause, same fix, as the dialog's other controls above:
+           the dialog forces every bit of TEXT inside it to a fixed light
+           color so it reads on the dialog's fixed dark card (its own
+           :is(p, span, div, ...) rule a bit above this one) — but an
+           expander (the collapsible category rows in Match Scoring, e.g.
+           "▶ Men's Doubles — Game 1 · not started") gets its own
+           BACKGROUND from the page-wide `[data-testid="stExpander"]` rule
+           below, which is light-mode CARD (near-white) whenever the app is
+           in light mode. Forced-light text on a near-white background is
+           the invisible/washed-out expander label seen in light mode —
+           exactly the white-on-white text bug already covered for the
+           Team A/Team B selectboxes, just for a different element that
+           wasn't covered yet. Pin the expander itself to the same fixed
+           dark colors as the rest of the dialog rather than letting it
+           inherit the page's current light/dark toggle. */
+        [data-testid="stDialog"] [data-testid="stExpander"] {{
+            background: #111725 !important;
+            border-color: rgba(255,255,255,.14) !important;
+        }}
+        [data-testid="stDialog"] [data-testid="stExpander"] summary,
+        [data-testid="stDialog"] [data-testid="stExpander"] summary * {{
+            color: #e8eaf0 !important;
+        }}
+        [data-testid="stDialog"] [data-testid="stExpander"] summary:hover,
+        [data-testid="stDialog"] [data-testid="stExpander"] summary:hover * {{
+            color: {GOLD_LT} !important;
+        }}
+
         /* ── TABS ── */
         button[data-baseweb="tab"] {{ border-radius: 8px 8px 0 0; font-weight: 700; color: {MUTED}; }}
         button[data-baseweb="tab"][aria-selected="true"] {{ color: {GOLD_DK} !important; border-bottom: 3px solid {GOLD} !important; }}
@@ -512,22 +540,6 @@ def inject_css():
         .sb-user-name {{ font-size:12px; font-weight:700; color:{SB_TEXT_HI}; }}
         .sb-user-role {{ font-size:10px; color:{MUTED}; letter-spacing:.04em; }}
 
-        /* Streamlit fades the sidebar's own collapse arrow ("«", top-right
-           of the sidebar, and the "»" to re-expand it once collapsed) to
-           near-invisible until hovered — fine on desktop where a mouse is
-           hovering around anyway, but it means the control effectively
-           doesn't exist for anyone on a touchscreen (no hover state at
-           all), and even on desktop it's easy to not notice it's there.
-           Forcing opacity alone wasn't enough for real visibility: the
-           button's own default background is a low-contrast neutral grey
-           that nearly matches the page background in light mode (which is
-           exactly why it read as "still not visible" even once shown) — so
-           this also gives it the same solid gold/orange gradient chip
-           treatment as the rest of the branded UI (theme toggle, avatar),
-           plus an explicit icon color, so it has real contrast against the
-           page in both light and dark mode rather than just technically
-           having opacity:1. Covers both current and recent Streamlit
-           testids since this element has been renamed across versions. */
         /* Streamlit fades the sidebar's own collapse arrow ("«", top-right
            of the sidebar, and the "»" to re-expand it once collapsed) to
            near-invisible until hovered — fine on desktop where a mouse is
