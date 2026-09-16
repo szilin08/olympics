@@ -1283,30 +1283,49 @@ def _kiosk_iframe_height(n_live):
     return 260 + rows * row_height
 
 
-def _kiosk_bracket_html(sport):
+def _kiosk_bracket_html(sport, phase="all"):
     """Wraps the (fairly large — the full double-elim tree is ~1800x1700px
     for badminton) bracket SVG/HTML in a header matching the Live Monitor's
-    branding, plus a scale-to-fit wrapper so the WHOLE bracket lands inside
-    the kiosk viewport instead of needing to scroll around a projector
-    screen to see the later rounds — which is what the raw canvas-sized
-    output looked like before this. The scale factor is computed in JS at
-    runtime from the iframe's OWN actual rendered width/height (available
-    via plain window.innerWidth/innerHeight inside that iframe's document)
-    rather than a fixed number picked in Python, so it's correct whatever
-    the real projector/screen resolution turns out to be, instead of
-    guessing one target size and hoping it matches on the day.
+    branding, plus a scale-to-fit wrapper so the bracket lands inside the
+    kiosk viewport instead of needing to scroll around a projector screen
+    to see the later rounds — which is what the raw canvas-sized output
+    looked like before this.
+
+    Fitting the WHOLE double-elim tree (winners + losers bracket stacked)
+    into one screen at once made every card's text tiny — the canvas is
+    nearly as tall as it is wide, but a projector screen is much wider
+    than it is tall, so height was always the limiting dimension and the
+    fitted scale came out small. phase="wb"/"lb" crops to just that half
+    (with a little overlap around the middle so the Grand Final card,
+    which sits right at the boundary between the two halves, shows up
+    fully in both crops) — half the height to fit into the same box
+    roughly doubles the usable scale. _render_kiosk_page alternates
+    between the two halves on successive bracket appearances. Pickleball's
+    single-elimination bracket is far shorter to begin with (~975px vs
+    badminton's ~1750px) and was already a reasonable fit uncropped, so
+    phase is a no-op there (always the whole thing).
     """
     if sport == "bd":
         bd = state.load_bd()
         inner = bracket_svg.render_bracket_view_html(bd)
         size = bracket_svg.canvas_size()
         icon, name = "🏸", "Badminton"
+        w, h = size["w"], size["h"]
+        overlap = 90
+        if phase == "wb":
+            crop_y0, crop_y1 = 0, h / 2 + overlap
+        elif phase == "lb":
+            crop_y0, crop_y1 = h / 2 - overlap, h
+        else:
+            crop_y0, crop_y1 = 0, h
     else:
         pk = state.load_pk()
         inner = bracket_svg.render_pk_bracket_view_html(pk)
         size = bracket_svg.pk_canvas_size()
         icon, name = "🏓", "Pickleball"
-    w, h = size["w"], size["h"]
+        w, h = size["w"], size["h"]
+        crop_y0, crop_y1 = 0, h
+    crop_h = crop_y1 - crop_y0
 
     header = f"""
     <div style="padding:20px 28px 4px;text-align:center">
@@ -1314,6 +1333,7 @@ def _kiosk_bracket_html(sport):
                   font-family:'DM Mono',monospace;margin-bottom:6px">LBS × MGB Sports Tournament</div>
       <div style="font-size:28px;font-weight:800;color:#fff;letter-spacing:-0.01em">
         {icon} LBS Olympics {name}! <span style="color:#d99a2b">Bracket</span>
+        {f'<span style="color:#8a877d;font-size:18px">&nbsp;·&nbsp;{"Winners" if phase == "wb" else "Losers"} Bracket</span>' if phase in ("wb", "lb") else ""}
       </div>
     </div>
     """
@@ -1323,8 +1343,8 @@ def _kiosk_bracket_html(sport):
       {header}
       <div id="bv-fit-outer" style="width:100%;height:calc(100vh - 110px);overflow:hidden;
                   display:flex;align-items:flex-start;justify-content:center">
-        <div id="bv-fit-inner" style="width:{w}px;height:{h}px;transform-origin:top center">
-          {inner}
+        <div id="bv-fit-inner" style="width:{w}px;height:{crop_h}px;overflow:hidden;transform-origin:top center">
+          <div style="position:relative;top:-{crop_y0}px">{inner}</div>
         </div>
       </div>
     </div>
@@ -1333,7 +1353,7 @@ def _kiosk_bracket_html(sport):
         var outer = document.getElementById('bv-fit-outer');
         var inner = document.getElementById('bv-fit-inner');
         if (!outer || !inner) return;
-        var scale = Math.min(outer.clientWidth / {w}, outer.clientHeight / {h}, 1);
+        var scale = Math.min(outer.clientWidth / {w}, outer.clientHeight / {crop_h}, 1);
         inner.style.transform = 'scale(' + scale + ')';
       }}
       bvFit();
@@ -1387,7 +1407,15 @@ def _render_kiosk_page(sport):
     show_bracket = slot == SLOTS_PER_CYCLE - 1
 
     if show_bracket:
-        html = _kiosk_bracket_html(sport)
+        # For badminton, alternate which HALF of the bracket shows on
+        # successive appearances (see _kiosk_bracket_html's docstring for
+        # why: fitting the whole double-elim tree on screen made the text
+        # tiny). Counts full trips around the cycle rather than slots, so
+        # it flips exactly once per bracket appearance, not partway through
+        # the 15s it's on screen for.
+        cycle_no = int(time.time() // (CYCLE_SECONDS * SLOTS_PER_CYCLE))
+        phase = ("wb" if cycle_no % 2 == 0 else "lb") if sport == "bd" else "all"
+        html = _kiosk_bracket_html(sport, phase=phase)
         components.html(html, height=900, scrolling=False)
     else:
         if sport == "bd":
