@@ -373,11 +373,30 @@ def _render_bd_tie_editor(tid, tie, pts, editable_structure=True):
             with st.expander(summary, expanded=False):
                 _games(_render_game_plain)
         else:
-            # Still live: show the category name, then only the games that
-            # still need attention get their own space — any already-
-            # finished game (e.g. 1-1 with game 3 in progress) collapses.
-            st.markdown(f"**{catname}**")
-            _games(_render_game)
+            # Still live: collapse it the same way a finished category
+            # does, rather than spelling out every category's score rows
+            # at once — with 5 categories (Mixed 1/2, Men's, Women's, and
+            # the tie-break) all expanded by default, an umpire had to
+            # scroll past four categories that aren't theirs to find the
+            # one they're actually scoring today. Collapsed by default
+            # (expanded=False) so it's a deliberate click to open the
+            # right one, not a wall of live score rows to hunt through.
+            # Uses _render_game_plain (never its own expander) rather than
+            # _render_game for the same reason the finished-category
+            # branch above does — Streamlit doesn't support nesting one
+            # expander inside another, so once the category itself is an
+            # expander, individual games inside it can't be too.
+            wins1 = sum(1 for g in cat["games"] if g["finished"] and g["p1"] > g["p2"])
+            wins2 = sum(1 for g in cat["games"] if g["finished"] and g["p2"] > g["p1"])
+            open_gi = next((gi for gi in logic.visible_games(cat["games"]) if not cat["games"][gi]["finished"]), None)
+            if open_gi is not None:
+                g = cat["games"][open_gi]
+                status = f"Game {open_gi + 1} · {g['p1']}–{g['p2']}" if (g["p1"] or g["p2"]) else f"Game {open_gi + 1} · not started"
+            else:
+                status = "in progress"
+            summary = f"▶ {catname} — {status} ({wins1}–{wins2})"
+            with st.expander(summary, expanded=False):
+                _games(_render_game_plain)
 
     if editable_structure:
         st.button("↺ Reset this tie", key=f"bd_{tid}_reset", on_click=partial(_bd_reset_tie_cb, tid))
