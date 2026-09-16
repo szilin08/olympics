@@ -74,11 +74,21 @@ components.html(
 # instead of any container's internal name sidesteps needing to guess
 # right about implementation details that keep moving: these two icon
 # names are Google's fixed, stable Material Symbols names, not anything
-# Streamlit-specific that a future release might rename. e.closest('button')
-# finds the actual clickable ancestor regardless of how many wrapper divs
-# sit in between, rather than climbing a fixed number of parent levels
-# (which the Fork-hiding function above deliberately avoids too, per its
-# own comment about overshooting past the intended element).
+# Streamlit-specific that a future release might rename.
+#
+# The fallback chain for finding the clickable ancestor to style tries,
+# in order: a real <button>, an ARIA button role, the nearest ancestor
+# carrying ANY data-testid (Streamlit tags its own component wrappers
+# this way even when the actual clickable element isn't a <button>), and
+# only then falls back to climbing a couple of plain parentElement levels.
+# This came from a real gap: the collapse ("«", sidebar open) arrow got
+# picked up and styled correctly on the first try, but the re-expand ("»",
+# sidebar collapsed) arrow didn't — the two apparently aren't built the
+# same way in this app's Streamlit version (very plausibly one is a real
+# <button> and the other is a plain clickable <div>), and the original
+# closest('button')-or-one-parent-level fallback only covered the first
+# case. Checking several possible container shapes instead of stopping at
+# the first two options.
 components.html(
     '<script>'
     'function lbsFixSidebarToggle(){'
@@ -87,7 +97,8 @@ components.html(
     'var t=e.textContent.trim();'
     'if(t==="keyboard_double_arrow_left"||t==="keyboard_double_arrow_right"){'
     'e.style.setProperty("color","#ffffff","important");'
-    'var btn=e.closest("button")||e.parentElement;'
+    'var btn=e.closest("button")||e.closest(\'[role="button"]\')||e.closest("[data-testid]")'
+    '||(e.parentElement&&e.parentElement.parentElement)||e.parentElement;'
     'if(btn){'
     'btn.style.setProperty("background","linear-gradient(135deg,#d99a2b,#a97a1e)","important");'
     'btn.style.setProperty("border","1px solid #a97a1e","important");'
@@ -95,6 +106,11 @@ components.html(
     'btn.style.setProperty("box-shadow","0 2px 8px rgba(0,0,0,.35)","important");'
     'btn.style.setProperty("opacity","1","important");'
     'btn.style.setProperty("visibility","visible","important");'
+    'btn.style.setProperty("display","flex","important");'
+    'btn.style.setProperty("align-items","center","important");'
+    'btn.style.setProperty("justify-content","center","important");'
+    'btn.style.setProperty("padding","6px","important");'
+    'btn.style.setProperty("cursor","pointer","important");'
     '}}});'
     '}'
     'lbsFixSidebarToggle();'
