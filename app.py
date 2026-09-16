@@ -180,6 +180,14 @@ def _intro_overlay_html():
 
 
 def main():
+    # Restores an admin/umpire login from the ?auth= token in the URL, if
+    # any — see auth.py's module docstring ("Staying logged in across
+    # refreshes") for why this exists: plain st.session_state alone drops
+    # people back to logged-out on a real page reload, which is what was
+    # actually happening despite nobody explicitly logging out. Must run
+    # before anything below checks auth.is_admin()/is_scorer().
+    auth.restore_session_from_token()
+
     kiosk = st.query_params.get("kiosk")
     if kiosk in ("badminton", "pickleball"):
         # A bare, chrome-free page meant to be opened on its own — e.g. on
