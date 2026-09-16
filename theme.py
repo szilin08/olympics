@@ -512,6 +512,23 @@ def inject_css():
         .sb-user-name {{ font-size:12px; font-weight:700; color:{SB_TEXT_HI}; }}
         .sb-user-role {{ font-size:10px; color:{MUTED}; letter-spacing:.04em; }}
 
+        /* Streamlit fades the sidebar's own collapse arrow ("«", top-right
+           of the sidebar) to invisible until the sidebar header is hovered
+           — fine on desktop where a mouse is hovering around anyway, but
+           it means the control effectively doesn't exist for anyone on a
+           touchscreen (no hover state at all), and even on desktop it's
+           easy to not notice it's there. Forcing opacity to 1 unconditionally
+           makes it a normal, always-visible button instead of a hover-only
+           affordance. Covers both current and recent Streamlit testids
+           since this has been renamed across versions. */
+        [data-testid="stSidebarCollapseButton"],
+        [data-testid="stSidebarCollapseButton"] button,
+        [data-testid="collapsedControl"],
+        [data-testid="stSidebarHeader"] button {{
+            opacity: 1 !important;
+            visibility: visible !important;
+        }}
+
         /* ── kiosk / projector fullscreen mode ──
            Toggled by JS on <body> when the Live Monitor's "Full Screen"
            button is used (see pages_public.py). The button actually
