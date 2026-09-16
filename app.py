@@ -295,7 +295,303 @@ def main():
                         <div class="sb-user-role">{role.upper()}</div>
                     </div>
                 </div>
+                """,import streamlit as st
+import streamlit.components.v1 as components
+
+import assets
+import auth
+import db
+import theme
+import pages_public
+import pages_admin
+
+st.set_page_config(page_title="LBS × MGB Sports Tournament", page_icon="🏆", layout="wide")
+db.init_db()
+theme.inject_css()
+
+# Streamlit Community Cloud's free tier shows a "Hosted with Streamlit"
+# badge, and — for apps deployed from a public repo — a "Fork" option, to
+# every visitor. Neither is owner-only chrome, and there's no official
+# setting to turn either off (the Fork option specifically requires the
+# GitHub repo to be public, which is what enables it — the only fully
+# reliable way to remove it is a private repo, which on the free tier means
+# named-viewer-only access instead of one link anyone can open). This is a
+# community-documented workaround, not something Streamlit provides support
+# for: unlike st.markdown, components.html actually executes <script> tags
+# (it renders in a real iframe with srcdoc, not via innerHTML), and
+# window.top reaches up out of that iframe to the actual outer page where
+# this chrome lives.
+#
+# An earlier version walked up a fixed 3 ancestor levels from any element
+# whose text was "Fork" to clear a wrapping pill background. Tested against
+# a mock toolbar with the icon+text nesting this kind of chrome actually
+# uses, that fixed-depth walk overshot past the toolbar entirely and hid
+# <body> — a blank page for every visitor. This version only ever hides a
+# LEAF element (no child elements of its own) whose own trimmed text is
+# exactly "Fork", never climbing to any ancestor — verified against that
+# same mock to correctly hide the word without touching surrounding
+# content, even a deliberately similar "Fork lift operator training"
+# button. It also polls every 800ms rather than running once, since
+# Community Cloud appears to inject this toolbar asynchronously after the
+# page's initial render. The trade-off: a small empty pill outline may
+# remain next to the "⋮" menu rather than disappearing entirely — worth it
+# for guaranteed safety over a cosmetic remnant. Still a visual hide via
+# best-effort text matching, not a real removal — if Streamlit changes
+# their page structure this may need updating again.
+components.html(
+    '<script>'
+    'function lbsHideCloudChrome(){'
+    'var doc=window.top.document;'
+    'doc.querySelectorAll(\'[href*="streamlit.io"]\').forEach(function(e){e.style.display="none";});'
+    'Array.from(doc.querySelectorAll("button,a,span,div")).forEach(function(e){'
+    'if(e.children.length===0&&e.textContent.trim()==="Fork"){'
+    'e.style.display="none";'
+    '}});'
+    '}'
+    'lbsHideCloudChrome();'
+    'setInterval(lbsHideCloudChrome,800);'
+    '</script>',
+    height=0,
+)
+
+# The sidebar's collapse ("«") / re-expand ("»") arrow is rendered as a
+# Material icon ligature font — a <span data-testid="stIconMaterial"> whose
+# TEXT CONTENT is literally "keyboard_double_arrow_left" or "...right",
+# with its color set by an inline style Streamlit applies directly, which
+# CSS in theme.py can only beat with a matching selector — and this
+# element's wrapping data-testid has been renamed across Streamlit
+# releases, so pinning to any one container name is fragile. Matching on
+# the icon's own text instead sidesteps that: these two names are
+# Google's fixed Material Symbols names, not Streamlit internals that
+# might get renamed.
+#
+# Two earlier attempts tried styling whichever ANCESTOR looked like the
+# real button (closest('button'), then a wider fallback chain including
+# role="button" and any data-testid). Both worked for the collapse ("«",
+# sidebar open) arrow but not the re-expand ("»", sidebar collapsed) one —
+# and DevTools inspection of that second arrow only ever showed the bare
+# <span> itself, with no easy way to see what wraps it. Rather than guess
+# at a third ancestor-matching scheme, this version sidesteps the need to
+# find any wrapping element at all: it styles the icon SPAN directly as
+# its own small rounded chip (background, padding, border-radius all on
+# the span), which renders correctly regardless of whatever unknown
+# element happens to contain it.
+components.html(
+    '<script>'
+    'function lbsFixSidebarToggle(){'
+    'var doc=window.top.document;'
+    'doc.querySelectorAll(\'span[data-testid="stIconMaterial"]\').forEach(function(e){'
+    'var t=e.textContent.trim();'
+    'if(t==="keyboard_double_arrow_left"||t==="keyboard_double_arrow_right"){'
+    'e.style.setProperty("color","#0d1425","important");'
+    'e.style.setProperty("background","linear-gradient(135deg,#d99a2b,#a97a1e)","important");'
+    'e.style.setProperty("border","1px solid #a97a1e","important");'
+    'e.style.setProperty("border-radius","8px","important");'
+    'e.style.setProperty("box-shadow","0 2px 8px rgba(0,0,0,.35)","important");'
+    'e.style.setProperty("opacity","1","important");'
+    'e.style.setProperty("visibility","visible","important");'
+    'e.style.setProperty("display","inline-flex","important");'
+    'e.style.setProperty("align-items","center","important");'
+    'e.style.setProperty("justify-content","center","important");'
+    'e.style.setProperty("padding","6px 8px","important");'
+    'e.style.setProperty("cursor","pointer","important");'
+    'e.style.setProperty("font-size","20px","important");'
+    'e.style.setProperty("line-height","1","important");'
+    '}});'
+    '}'
+    'lbsFixSidebarToggle();'
+    'setInterval(lbsFixSidebarToggle,800);'
+    '</script>',
+    height=0,
+)
+
+VIEWER_PAGES = [
+    ("Badminton", "🏸", pages_public.render_badminton_monitor),
+    ("Pickleball", "🏓", pages_public.render_pickleball_monitor),
+]
+
+ADMIN_PAGES = [
+    ("Badminton — Admin", "🎯", pages_admin.render_badminton_admin),
+    ("Pickleball — Admin", "📝", pages_admin.render_pickleball_admin),
+]
+
+UMPIRE_PAGES = [
+    ("Badminton — Umpiring", "🏸", pages_admin.render_badminton_umpire),
+    ("Pickleball — Umpiring", "🏓", pages_admin.render_pickleball_umpire),
+]
+
+
+def _nav_button(label, icon, active):
+    clicked = st.button(
+        label, key=f"navbtn_{label}", use_container_width=True,
+        type="primary" if active else "secondary",
+    )
+    if clicked:
+        st.session_state["current_page"] = label
+        st.rerun()
+
+
+def _intro_overlay_html():
+    """One-time cinematic welcome splash, shown only on the very first
+    render of a session (gated by session_state in main(), not here).
+    Built as pure CSS keyframe animation — no <script> tag and no onclick
+    JS, since st.markdown injects via innerHTML, which browsers do not
+    execute embedded <script> tags for (a real Streamlit quirk hit earlier
+    in this project — components.html's iframe does execute scripts,
+    plain st.markdown does not). A purely CSS-driven auto-dismiss sidesteps
+    that entirely: the outer overlay carries its own keyframe animation
+    that holds it opaque for ~3.6s then fades it to invisible AND
+    pointer-events:none over the final ~0.9s, so it never blocks clicks
+    on the dashboard underneath once it's done. Built as one unbroken
+    concatenation (no literal blank lines) for the same reason the crest
+    SVG was — a blank line inside a multi-line HTML string fed to
+    st.markdown ends the raw-HTML block early under Streamlit's CommonMark
+    parser, even with unsafe_allow_html=True."""
+    crest_b64 = assets.CREST_LOGO_B64
+    style = (
+        "<style>"
+        "@keyframes lbsIntroFade{0%{opacity:0;transform:translateY(8px);}100%{opacity:1;transform:translateY(0);}}"
+        "@keyframes lbsIntroScale{0%{opacity:0;transform:scale(.6);}100%{opacity:1;transform:scale(1);}}"
+        "@keyframes lbsOverlayOut{0%{opacity:1;}80%{opacity:1;}100%{opacity:0;visibility:hidden;pointer-events:none;}}"
+        "</style>"
+    )
+    overlay = (
+        '<div style="position:fixed;inset:0;z-index:999999;'
+        'background:radial-gradient(circle at 50% 35%,#151b2c 0%,#0a0e17 65%);'
+        'display:flex;align-items:center;justify-content:center;flex-direction:column;'
+        'animation:lbsOverlayOut 4.5s ease forwards;">'
+        '<div style="animation:lbsIntroScale .9s cubic-bezier(.2,.8,.2,1) both;">'
+        f'<img src="data:image/png;base64,{crest_b64}" alt="LBS Olympics Championship" '
+        'style="width:150px;height:150px;filter:drop-shadow(0 6px 24px rgba(217,154,43,.35));">'
+        '</div>'
+        '<div style="margin-top:26px;font-family:\'DM Mono\',monospace;font-size:13px;letter-spacing:.35em;'
+        'color:#d99a2b;text-transform:uppercase;opacity:0;animation:lbsIntroFade .8s ease .5s forwards;">Welcome to</div>'
+        '<div style="margin-top:10px;font-size:44px;font-weight:800;color:#fdf3e4;letter-spacing:-0.01em;'
+        'text-align:center;opacity:0;animation:lbsIntroFade .9s ease .8s forwards;">LBS '
+        '<span style="font-style:italic;font-family:\'Playfair Display\',serif;color:#e2984a;font-weight:600;">'
+        'Olympics</span> 2026</div>'
+        '<div style="margin-top:14px;font-family:\'DM Mono\',monospace;font-size:11px;letter-spacing:.2em;'
+        'color:#8b93a6;text-transform:uppercase;opacity:0;animation:lbsIntroFade .8s ease 1.2s forwards;">'
+        'Badminton &times; Pickleball Championship</div>'
+        '<div style="margin-top:34px;width:64px;height:2px;'
+        'background:linear-gradient(90deg,transparent,#d99a2b,transparent);'
+        'opacity:0;animation:lbsIntroFade .8s ease 1.6s forwards;"></div>'
+        '</div>'
+    )
+    return style + overlay
+
+
+def main():
+    # Restores an admin/umpire login from the ?auth= token in the URL, if
+    # any — see auth.py's module docstring ("Staying logged in across
+    # refreshes") for why this exists: plain st.session_state alone drops
+    # people back to logged-out on a real page reload, which is what was
+    # actually happening despite nobody explicitly logging out. Must run
+    # before anything below checks auth.is_admin()/is_scorer().
+    auth.restore_session_from_token()
+
+    kiosk = st.query_params.get("kiosk")
+    if kiosk in ("badminton", "pickleball"):
+        # A bare, chrome-free page meant to be opened on its own — e.g. on
+        # a projector or a dedicated kiosk laptop — instead of navigating
+        # to the Live Monitor tab inside the full app. There's no sidebar
+        # or header rendered here at all, so there's no Streamlit chrome
+        # for the in-page "Full Screen" button's refresh cycle to ever
+        # expose again; and because this page never builds any of that
+        # chrome in the first place, the browser's OWN fullscreen (F11) can
+        # be used on the tab and it'll stay clean through every refresh,
+        # since browser-level fullscreen isn't tied to any on-page element
+        # the way the JS Fullscreen API is.
+        if kiosk == "badminton":
+            pages_public.render_badminton_kiosk()
+        else:
+            pages_public.render_pickleball_kiosk()
+        return
+
+    if "intro_played" not in st.session_state:
+        st.session_state["intro_played"] = True
+        st.markdown(_intro_overlay_html(), unsafe_allow_html=True)
+
+    if "current_page" not in st.session_state:
+        st.session_state["current_page"] = "Badminton"
+
+    available = dict((label, fn) for label, _, fn in VIEWER_PAGES)
+    if auth.is_admin():
+        available.update((label, fn) for label, _, fn in ADMIN_PAGES)
+    if auth.is_scorer():
+        available.update((label, fn) for label, _, fn in UMPIRE_PAGES)
+
+    # Bounce back to the default viewer page if the current page no longer
+    # exists — either the admin logged out while on an admin-only page, or
+    # (as with the removed Schedule & Settings and Home pages) a page was
+    # retired while someone's session still pointed at it.
+    if st.session_state["current_page"] not in available:
+        st.session_state["current_page"] = "Badminton"
+
+    with st.sidebar:
+        st.markdown(
+            f"""
+            <div class="sb-partner-logo">
+                <img src="data:image/png;base64,{assets.LBS_LOGO_B64}" alt="LBS 65 Years">
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"""
+            <div class="sb-logo-wrap">
+                <div class="sb-crest"><img src="data:image/png;base64,{assets.CREST_LOGO_B64}" alt="LBS Olympics Championship"></div>
+                <div class="sb-logo-title">LBS <span class="sb-logo-x">×</span> MGB</div>
+                <div class="sb-logo-sub">Sports Tournament</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown('<div class="nav-label">Viewer</div>', unsafe_allow_html=True)
+        for label, icon, _ in VIEWER_PAGES:
+            _nav_button(label, icon, st.session_state["current_page"] == label)
+
+        if auth.is_admin():
+            st.markdown('<div class="nav-label">Admin</div>', unsafe_allow_html=True)
+            for label, icon, _ in ADMIN_PAGES:
+                _nav_button(label, icon, st.session_state["current_page"] == label)
+
+        if auth.is_scorer():
+            st.markdown('<div class="nav-label">Umpiring</div>', unsafe_allow_html=True)
+            for label, icon, _ in UMPIRE_PAGES:
+                _nav_button(label, icon, st.session_state["current_page"] == label)
+
+        # ── bottom block: admin + umpire login, then the user chip with the
+        # dark/light toggle sitting right beside it in a narrow column ──
+        st.markdown('<hr class="sb-bottom-divider">', unsafe_allow_html=True)
+        auth.login_widget()
+        auth.umpire_login_widget()
+
+        who = st.session_state.get("admin_name", "Viewer") if auth.is_scorer() else "Viewer"
+        role = "Admin" if auth.is_admin() else ("Umpire" if auth.is_umpire() else "Viewer")
+        user_col, toggle_col = st.columns([4, 1])
+        with user_col:
+            st.markdown(
+                f"""
+                <div class="sb-user-row">
+                    <div class="sb-avatar">{who[:2].upper()}</div>
+                    <div>
+                        <div class="sb-user-name">{who}</div>
+                        <div class="sb-user-role">{role.upper()}</div>
+                    </div>
+                </div>
                 """,
+                unsafe_allow_html=True,
+            )
+        with toggle_col:
+            theme.toggle_widget()
+
+    available[st.session_state["current_page"]]()
+
+
+if __name__ == "__main__":
+    main()
                 unsafe_allow_html=True,
             )
         with toggle_col:
