@@ -513,45 +513,84 @@ def inject_css():
         .sb-user-role {{ font-size:10px; color:{MUTED}; letter-spacing:.04em; }}
 
         /* Streamlit fades the sidebar's own collapse arrow ("«", top-right
-           of the sidebar) to invisible until the sidebar header is hovered
-           — fine on desktop where a mouse is hovering around anyway, but
-           it means the control effectively doesn't exist for anyone on a
-           touchscreen (no hover state at all), and even on desktop it's
-           easy to not notice it's there. Forcing opacity to 1 unconditionally
-           makes it a normal, always-visible button instead of a hover-only
-           affordance. Covers both current and recent Streamlit testids
-           since this has been renamed across versions. */
+           of the sidebar, and the "»" to re-expand it once collapsed) to
+           near-invisible until hovered — fine on desktop where a mouse is
+           hovering around anyway, but it means the control effectively
+           doesn't exist for anyone on a touchscreen (no hover state at
+           all), and even on desktop it's easy to not notice it's there.
+           Forcing opacity alone wasn't enough for real visibility: the
+           button's own default background is a low-contrast neutral grey
+           that nearly matches the page background in light mode (which is
+           exactly why it read as "still not visible" even once shown) — so
+           this also gives it the same solid gold/orange gradient chip
+           treatment as the rest of the branded UI (theme toggle, avatar),
+           plus an explicit icon color, so it has real contrast against the
+           page in both light and dark mode rather than just technically
+           having opacity:1. Covers both current and recent Streamlit
+           testids since this element has been renamed across versions. */
+        /* Streamlit fades the sidebar's own collapse arrow ("«", top-right
+           of the sidebar, and the "»" to re-expand it once collapsed) to
+           near-invisible until hovered — fine on desktop where a mouse is
+           hovering around anyway, but it means the control effectively
+           doesn't exist for anyone on a touchscreen (no hover state at
+           all), and even on desktop it's easy to not notice it's there.
+           Forcing opacity alone wasn't enough for real visibility: the
+           button's own default background is a low-contrast neutral grey
+           that nearly matches the page background in light mode (which is
+           exactly why it read as "still not visible" even once shown).
+
+           This element's internal data-testid has been renamed multiple
+           times across Streamlit releases (collapsedControl →
+           stSidebarCollapseButton → stSidebarCollapsedControl, and back),
+           so pinning to any one of those is fragile — a version bump can
+           silently stop matching again, which is what happened here: the
+           previous attempt's testids didn't match whatever this app's
+           actual Streamlit version renders. aria-label is far more stable
+           since it's user-facing accessibility text ("Open sidebar" /
+           "Close sidebar" / similar), not an internal implementation
+           name, so `[aria-label*="idebar" i]` is the primary selector here
+           — the testid list is kept alongside it only as a belt-and-braces
+           fallback. Styled on BOTH the outer element and any inner
+           button/svg, since it's not certain from here which one is the
+           actually-rendered clickable/visible node in this app's specific
+           Streamlit version. */
+        [aria-label*="idebar" i],
+        [aria-label*="idebar" i] *,
         [data-testid="stSidebarCollapseButton"],
-        [data-testid="stSidebarCollapseButton"] button,
+        [data-testid="stSidebarCollapseButton"] *,
         [data-testid="collapsedControl"],
-        [data-testid="stSidebarHeader"] button {{
+        [data-testid="collapsedControl"] *,
+        [data-testid="stSidebarCollapsedControl"],
+        [data-testid="stSidebarCollapsedControl"] *,
+        [data-testid="stSidebarHeader"] button,
+        [data-testid="stSidebarHeader"] button * {{
             opacity: 1 !important;
             visibility: visible !important;
         }}
-
-        /* ── kiosk / projector fullscreen mode ──
-           Toggled by JS on <body> when the Live Monitor's "Full Screen"
-           button is used (see pages_public.py). The button actually
-           fullscreens the WHOLE tab (document.documentElement), not just
-           the scoreboard widget, specifically because that widget lives
-           inside a components.html iframe that gets a fresh srcdoc on
-           every auto-refresh rerun — fullscreening an element THAT gets
-           destroyed/recreated every N seconds is what closed fullscreen on
-           refresh. Fullscreening the tab itself survives reruns since
-           Streamlit never tears down <html>/<body>. These rules just hide
-           the normal app chrome around it so it still reads as a clean,
-           edge-to-edge scoreboard rather than the full dashboard UI. */
-        body.lbs-kiosk [data-testid="stSidebar"],
-        body.lbs-kiosk [data-testid="stHeader"],
-        body.lbs-kiosk [data-testid="stToolbar"],
-        body.lbs-kiosk [data-testid="stStatusWidget"],
-        body.lbs-kiosk footer {{ display: none !important; }}
-        body.lbs-kiosk [data-testid="stAppViewContainer"] {{ margin-left: 0 !important; }}
-        body.lbs-kiosk [data-testid="stMain"] .block-container,
-        body.lbs-kiosk [data-testid="stAppViewContainer"] .block-container {{
-            padding: 0 !important; max-width: 100% !important;
+        [aria-label*="idebar" i],
+        [data-testid="stSidebarCollapseButton"],
+        [data-testid="collapsedControl"],
+        [data-testid="stSidebarCollapsedControl"],
+        [data-testid="stSidebarHeader"] button {{
+            background: linear-gradient(135deg, {GOLD} 0%, {GOLD_DK} 100%) !important;
+            border: 1px solid {GOLD_DK} !important;
+            border-radius: 8px !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.3) !important;
         }}
-        body.lbs-kiosk {{ background: #0a0a08 !important; }}
+        [aria-label*="idebar" i] svg, [aria-label*="idebar" i] *,
+        [data-testid="stSidebarCollapseButton"] svg, [data-testid="stSidebarCollapseButton"] *,
+        [data-testid="collapsedControl"] svg, [data-testid="collapsedControl"] *,
+        [data-testid="stSidebarCollapsedControl"] svg, [data-testid="stSidebarCollapsedControl"] *,
+        [data-testid="stSidebarHeader"] button svg {{
+            fill: {ACCENT_INK} !important; color: {ACCENT_INK} !important;
+        }}
+        [aria-label*="idebar" i]:hover,
+        [data-testid="stSidebarCollapseButton"]:hover,
+        [data-testid="collapsedControl"]:hover,
+        [data-testid="stSidebarCollapsedControl"]:hover,
+        [data-testid="stSidebarHeader"] button:hover {{
+            filter: brightness(1.08);
+        }}
         </style>
         """,
         unsafe_allow_html=True,
