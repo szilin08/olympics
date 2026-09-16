@@ -449,7 +449,7 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
                   font-family:'DM Mono',monospace;margin-bottom:12px">Tournament Overview</div>
       {sections}
     """
-    return f"""
+    html = f"""
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <div style="color-scheme:dark;background:#111110;padding:20px;border-radius:12px;font-family:'Inter',sans-serif;min-height:850px">
       <div id="bd-live-now" class="{'bd-fs' if live_only else ''}">
@@ -639,6 +639,7 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
       .mon-tile-card::-webkit-scrollbar-thumb {{ background: #3a3a34; border-radius: 4px; }}
     </style>
     """
+    return html, len(live)
 
 
 def _live_autorefresh_control(key, default=15):
@@ -725,7 +726,7 @@ def render_badminton_monitor():
             refresh_interval = _live_autorefresh_control("bd_mon_refresh_secs")
         rounds = st.multiselect("Show rounds", logic.ALL_BD_ROUNDS, default=logic.ALL_BD_ROUNDS,
                                  format_func=lambda r: logic.BD_ROUND_INFO[r]["label"], key="bd_mon_rounds")
-        html = _render_bd_monitor_html(bd, rounds)
+        html, _ = _render_bd_monitor_html(bd, rounds)
         components.html(html, height=900, scrolling=True)
         _live_autorefresh_wait(refresh_interval)
 
@@ -1054,7 +1055,7 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
                   font-family:'DM Mono',monospace;margin-bottom:12px">Tournament Overview</div>
       {sections}
     """
-    return f"""
+    html = f"""
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <div style="color-scheme:dark;background:#111110;padding:20px;border-radius:12px;font-family:'Inter',sans-serif;min-height:850px">
       <div id="pk-live-now" class="{'pk-fs' if live_only else ''}">
@@ -1220,6 +1221,7 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
       .mon-tile-card::-webkit-scrollbar-thumb {{ background: #3a3a34; border-radius: 4px; }}
     </style>
     """
+    return html, len(live)
 
 
 def render_pickleball_monitor():
@@ -1254,9 +1256,31 @@ def render_pickleball_monitor():
             refresh_interval = _live_autorefresh_control("pk_mon_refresh_secs")
         rounds = st.multiselect("Show rounds", logic.ALL_PK_ROUNDS, default=logic.ALL_PK_ROUNDS,
                                  format_func=lambda r: logic.PK_ROUND_LABELS[r], key="pk_mon_rounds")
-        html = _render_pk_monitor_html(pk, rounds)
+        html, _ = _render_pk_monitor_html(pk, rounds)
         components.html(html, height=900, scrolling=True)
         _live_autorefresh_wait(refresh_interval)
+
+
+def _kiosk_iframe_height(n_live):
+    """Estimates how tall the kiosk page's iframe needs to be to fit every
+    live match without an inner scrollbar — a fixed height (700px) was
+    fine for 1-2 matches but left 6-8 simultaneous matches needing to
+    scroll INSIDE the black box, which defeats the point of a kiosk/
+    projector display nobody's meant to touch. Mirrors the same tier/
+    column logic the tile grid itself uses (_balanced_grid_cols, and the
+    lg/md/sm size tiers) so the estimate tracks whatever's actually
+    rendered rather than drifting out of sync with it. Erring generous
+    rather than exact is fine here — any leftover space is just more of
+    the matching black background, not a visible gap."""
+    if n_live == 0:
+        return 500
+    if n_live == 1:
+        return 900
+    cols = _balanced_grid_cols(n_live)
+    rows = -(-n_live // cols)  # ceil division
+    tier = "lg" if n_live <= 3 else ("md" if n_live <= 6 else "sm")
+    row_height = {"lg": 430, "md": 300, "sm": 220}[tier]
+    return 260 + rows * row_height
 
 
 def _render_kiosk_page(sport):
@@ -1270,6 +1294,9 @@ def _render_kiosk_page(sport):
     clean through every refresh — browser-level fullscreen isn't tied to
     any on-page element the way the JS Fullscreen API is, so it isn't
     affected by this page's content reloading underneath it.
+
+    Alternates between the Live Monitor and Bracket View — see the timing
+    comment further down for how/why.
     """
     st.markdown(
         """
@@ -1284,14 +1311,41 @@ def _render_kiosk_page(sport):
         """,
         unsafe_allow_html=True,
     )
-    if sport == "bd":
-        bd = state.load_bd()
-        html = _render_bd_monitor_html(bd, logic.ALL_BD_ROUNDS, live_only=True)
+    # Alternates between the Live Monitor and the Bracket View on a timer,
+    # weighted toward the live monitor (that's what most people actually
+    # want up on the projector most of the time) with the bracket popping
+    # up periodically for overall context. Purely time-based (wall clock
+    # via time.time(), not session_state) rather than counting reruns —
+    # session_state is per-tab, so counting reruns would let two projector
+    # tabs (or a projector tab plus someone's laptop open to the same
+    # kiosk URL) drift out of sync with each other and show different
+    # views at the same moment; time.time() is the same for everyone,
+    # so every screen showing this page lands on the same phase together.
+    CYCLE_SECONDS = 15   # matches the refresh interval below
+    SLOTS_PER_CYCLE = 5  # 1 bracket slot for every 4 live-monitor slots
+    slot = int(time.time() // CYCLE_SECONDS) % SLOTS_PER_CYCLE
+    show_bracket = slot == SLOTS_PER_CYCLE - 1
+
+    if show_bracket:
+        if sport == "bd":
+            bd = state.load_bd()
+            html = bracket_svg.render_bracket_view_html(bd)
+            height = bracket_svg.canvas_size()["h"] + 40
+        else:
+            pk = state.load_pk()
+            html = bracket_svg.render_pk_bracket_view_html(pk)
+            height = bracket_svg.pk_canvas_size()["h"] + 40
+        components.html(html, height=height, scrolling=True)
     else:
-        pk = state.load_pk()
-        html = _render_pk_monitor_html(pk, logic.ALL_PK_ROUNDS, live_only=True)
-    components.html(html, height=700, scrolling=True)
-    time.sleep(15)
+        if sport == "bd":
+            bd = state.load_bd()
+            html, n_live = _render_bd_monitor_html(bd, logic.ALL_BD_ROUNDS, live_only=True)
+        else:
+            pk = state.load_pk()
+            html, n_live = _render_pk_monitor_html(pk, logic.ALL_PK_ROUNDS, live_only=True)
+        components.html(html, height=_kiosk_iframe_height(n_live), scrolling=True)
+
+    time.sleep(CYCLE_SECONDS)
     st.rerun()
 
 
