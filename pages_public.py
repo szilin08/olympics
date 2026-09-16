@@ -1283,6 +1283,66 @@ def _kiosk_iframe_height(n_live):
     return 260 + rows * row_height
 
 
+def _kiosk_bracket_html(sport):
+    """Wraps the (fairly large — the full double-elim tree is ~1800x1700px
+    for badminton) bracket SVG/HTML in a header matching the Live Monitor's
+    branding, plus a scale-to-fit wrapper so the WHOLE bracket lands inside
+    the kiosk viewport instead of needing to scroll around a projector
+    screen to see the later rounds — which is what the raw canvas-sized
+    output looked like before this. The scale factor is computed in JS at
+    runtime from the iframe's OWN actual rendered width/height (available
+    via plain window.innerWidth/innerHeight inside that iframe's document)
+    rather than a fixed number picked in Python, so it's correct whatever
+    the real projector/screen resolution turns out to be, instead of
+    guessing one target size and hoping it matches on the day.
+    """
+    if sport == "bd":
+        bd = state.load_bd()
+        inner = bracket_svg.render_bracket_view_html(bd)
+        size = bracket_svg.canvas_size()
+        icon, name = "🏸", "Badminton"
+    else:
+        pk = state.load_pk()
+        inner = bracket_svg.render_pk_bracket_view_html(pk)
+        size = bracket_svg.pk_canvas_size()
+        icon, name = "🏓", "Pickleball"
+    w, h = size["w"], size["h"]
+
+    header = f"""
+    <div style="padding:20px 28px 4px;text-align:center">
+      <div style="font-size:11px;font-weight:800;letter-spacing:.16em;color:#8a877d;text-transform:uppercase;
+                  font-family:'DM Mono',monospace;margin-bottom:6px">LBS × MGB Sports Tournament</div>
+      <div style="font-size:28px;font-weight:800;color:#fff;letter-spacing:-0.01em">
+        {icon} LBS Olympics {name}! <span style="color:#d99a2b">Bracket</span>
+      </div>
+    </div>
+    """
+    return f"""
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <div style="background:#0a0a08;min-height:100vh;box-sizing:border-box">
+      {header}
+      <div id="bv-fit-outer" style="width:100%;height:calc(100vh - 110px);overflow:hidden;
+                  display:flex;align-items:flex-start;justify-content:center">
+        <div id="bv-fit-inner" style="width:{w}px;height:{h}px;transform-origin:top center">
+          {inner}
+        </div>
+      </div>
+    </div>
+    <script>
+      function bvFit() {{
+        var outer = document.getElementById('bv-fit-outer');
+        var inner = document.getElementById('bv-fit-inner');
+        if (!outer || !inner) return;
+        var scale = Math.min(outer.clientWidth / {w}, outer.clientHeight / {h}, 1);
+        inner.style.transform = 'scale(' + scale + ')';
+      }}
+      bvFit();
+      window.addEventListener('resize', bvFit);
+      setTimeout(bvFit, 200);
+    </script>
+    """
+
+
 def _render_kiosk_page(sport):
     """Bare, chrome-free page meant to be opened on its own — on a
     projector or a dedicated kiosk laptop — instead of navigating to the
@@ -1327,15 +1387,8 @@ def _render_kiosk_page(sport):
     show_bracket = slot == SLOTS_PER_CYCLE - 1
 
     if show_bracket:
-        if sport == "bd":
-            bd = state.load_bd()
-            html = bracket_svg.render_bracket_view_html(bd)
-            height = bracket_svg.canvas_size()["h"] + 40
-        else:
-            pk = state.load_pk()
-            html = bracket_svg.render_pk_bracket_view_html(pk)
-            height = bracket_svg.pk_canvas_size()["h"] + 40
-        components.html(html, height=height, scrolling=True)
+        html = _kiosk_bracket_html(sport)
+        components.html(html, height=900, scrolling=False)
     else:
         if sport == "bd":
             bd = state.load_bd()
