@@ -549,6 +549,22 @@ def inject_css():
            Forcing opacity alone wasn't enough for real visibility: the
            button's own default background is a low-contrast neutral grey
            that nearly matches the page background in light mode (which is
+           exactly why it read as "still not visible" even once shown) — so
+           this also gives it the same solid gold/orange gradient chip
+           treatment as the rest of the branded UI (theme toggle, avatar),
+           plus an explicit icon color, so it has real contrast against the
+           page in both light and dark mode rather than just technically
+           having opacity:1. Covers both current and recent Streamlit
+           testids since this element has been renamed across versions. */
+        /* Streamlit fades the sidebar's own collapse arrow ("«", top-right
+           of the sidebar, and the "»" to re-expand it once collapsed) to
+           near-invisible until hovered — fine on desktop where a mouse is
+           hovering around anyway, but it means the control effectively
+           doesn't exist for anyone on a touchscreen (no hover state at
+           all), and even on desktop it's easy to not notice it's there.
+           Forcing opacity alone wasn't enough for real visibility: the
+           button's own default background is a low-contrast neutral grey
+           that nearly matches the page background in light mode (which is
            exactly why it read as "still not visible" even once shown).
 
            This element's internal data-testid has been renamed multiple
@@ -602,6 +618,26 @@ def inject_css():
         [data-testid="stSidebarCollapsedControl"]:hover,
         [data-testid="stSidebarHeader"] button:hover {{
             filter: brightness(1.08);
+        }}
+
+        /* Diagnostic/blunt-force fallback: every previous attempt at this
+           arrow — ancestor-based CSS, ancestor-based JS, even styling the
+           icon <span> itself directly via JS — produced no visible change
+           at all for the re-expand ("»", sidebar collapsed) arrow, which
+           is unusual; a plain, unscoped attribute selector in a normal
+           stylesheet (no JS, no iframe, no ancestor-matching to get wrong)
+           is about as hard to fail silently as CSS gets. This intentionally
+           recolors EVERY Material Symbols icon in the app orange, not just
+           this one, as a trade worth making right now: if this doesn't
+           turn the arrow orange either, that's the important signal — it
+           would mean the icon isn't reachable through the page's normal
+           stylesheet cascade at all (e.g. it's rendered in a separate
+           embedding frame Streamlit Cloud adds around the app, or inside
+           a shadow DOM boundary), which is a fundamentally different
+           problem than a wrong selector and would need a different fix
+           entirely. Narrow this back down once it's confirmed working. */
+        span[data-testid="stIconMaterial"] {{
+            color: #ff6a13 !important;
         }}
         </style>
         """,
