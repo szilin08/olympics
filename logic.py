@@ -136,6 +136,26 @@ def bd_rebuild_routing(old_bd):
         bd_recompute(new_bd, tid)
     new_bd["open"] = old_bd.get("open", {})
     return new_bd
+def bd_reset_scores(old_bd):
+    """Clear every score, category result, and cascaded team assignment
+    back to blank, but keep the Round 1 (W1_0..W1_7) team pairings the
+    admin actually typed in — the same "what's typed vs. what's derived"
+    split bd_rebuild_routing uses above, just without replaying any cats
+    back in. Everything downstream of Round 1 (every other tie's t1/t2,
+    every game score, every winner) only exists because it cascaded from
+    a finished game, so wiping scores back to zero means those derived
+    team names have nothing to justify them either — they go back to
+    blank too, ready for Round 1 to cascade forward again from scratch."""
+    new_bd = bd_init()
+    old_ties = old_bd.get("ties", {})
+    for i in range(8):
+        tid = f"W1_{i}"
+        old_tie = old_ties.get(tid)
+        if old_tie:
+            new_bd["ties"][tid]["t1"] = old_tie.get("t1", "")
+            new_bd["ties"][tid]["t2"] = old_tie.get("t2", "")
+    new_bd["open"] = old_bd.get("open", {})
+    return new_bd
 def bd_cat_winner(cat):
     w1 = w2 = 0
     for g in cat["games"]:
