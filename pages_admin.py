@@ -350,7 +350,22 @@ def _render_bd_tie_editor(tid, tie, pts, editable_structure=True):
     for ci, catname in enumerate(logic.BD_CATS):
         cat = tie["cats"][ci]
         is_tb = ci == 4
-        if is_tb and not (tie["tbNeeded"] or any(g["finished"] for g in cat["games"])):
+        tb_locked = is_tb and not (tie["tbNeeded"] or any(g["finished"] for g in cat["games"]))
+        if tb_locked:
+            # Always show the tie-breaker row — even when it isn't needed
+            # yet — so it's visibly present in the dialog from the start,
+            # rather than appearing to materialize out of nowhere only
+            # once a tie happens. Rendered as a locked, greyed-out
+            # placeholder (no score inputs) so there's nothing to
+            # accidentally click or score before it's actually live; it
+            # switches to the normal interactive category below the
+            # moment the other 4 categories split 2–2.
+            st.markdown(
+                f"<div style='opacity:0.45;padding:10px 14px;border:1px dashed #555;"
+                f"border-radius:8px;margin-bottom:8px;font-size:0.9em;'>"
+                f"🔒 {catname} — locked, only activates if the first 4 categories split 2–2</div>",
+                unsafe_allow_html=True,
+            )
             continue
         t1_name, t2_name = tie["t1"] or "Team A", tie["t2"] or "Team B"
         cat_winner = logic.bd_cat_winner(cat)
