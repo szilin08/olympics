@@ -46,6 +46,17 @@ def reset_bd(actor="admin"):
     return bd
 
 
+def reset_bd_scores(actor="admin"):
+    """Clears every score, category result, and cascaded team assignment
+    back to blank, but keeps the Round 1 team pairings you entered —
+    mirrors reset_pk_scores below, just for the badminton bracket, which
+    doesn't have a separate group/knockout split to reset independently."""
+    bd = load_bd()
+    new_bd = logic.bd_reset_scores(bd)
+    save_bd(new_bd, actor=actor, action="reset_scores")
+    return new_bd
+
+
 def reset_pk(actor="admin"):
     pk = logic.pk_init_default()
     save_pk(pk, actor=actor, action="reset_all")
