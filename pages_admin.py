@@ -240,19 +240,42 @@ def _render_badminton_scoring(editable_structure: bool):
     bd = state.load_bd()
 
     if editable_structure:
-        top1, top2 = st.columns([3, 1])
-        with top2:
-            if st.button("↺ Reset entire bracket", use_container_width=True):
-                st.session_state["confirm_bd_reset"] = True
-            if st.session_state.get("confirm_bd_reset"):
-                st.warning("This clears **all** teams and scores. This cannot be undone.")
+        # Two tiers, same shape as the Pickleball reset panel: a soft reset
+        # that clears scores but keeps the Round 1 pairings you typed in
+        # (so you don't have to re-enter all 16 teams to fix a scoring
+        # mistake), and a full wipe. Badminton doesn't have a separate
+        # "group stage vs. knockout" split like Pickleball does — it's one
+        # continuous bracket — so there's no middle "reset knockout only"
+        # tier here; scores vs. everything covers it.
+        with st.expander("↺ Reset options", expanded=False, key="exp_bd_reset_options"):
+            r1, r2 = st.columns(2)
+            with r1:
+                st.button("Reset all scores", use_container_width=True,
+                          help="Clears every score, category result, and cascaded team assignment "
+                               "back to blank. Keeps the Round 1 team pairings you entered so you "
+                               "don't have to re-type all 16 teams.",
+                          on_click=lambda: st.session_state.update(confirm_bd_reset="scores"))
+            with r2:
+                st.button("Reset everything", use_container_width=True,
+                          help="Clears the entire bracket — Round 1 team pairings, every score, "
+                               "and every result.",
+                          on_click=lambda: st.session_state.update(confirm_bd_reset="all"))
+
+            pending = st.session_state.get("confirm_bd_reset")
+            if pending:
+                labels = {"scores": "**all scores and category results** (Round 1 team pairings stay as-is)",
+                          "all": "**everything** — Round 1 team pairings, every score, and every result"}
+                st.warning(f"This clears {labels[pending]}. This cannot be undone.")
                 c1, c2 = st.columns(2)
                 if c1.button("Yes, reset", key="bd_reset_yes", type="primary", use_container_width=True):
-                    state.reset_bd(actor=auth.actor_name())
-                    st.session_state["confirm_bd_reset"] = False
+                    if pending == "scores":
+                        state.reset_bd_scores(actor=auth.actor_name())
+                    else:
+                        state.reset_bd(actor=auth.actor_name())
+                    st.session_state["confirm_bd_reset"] = None
                     st.rerun()
                 if c2.button("Cancel", key="bd_reset_no", use_container_width=True):
-                    st.session_state["confirm_bd_reset"] = False
+                    st.session_state["confirm_bd_reset"] = None
                     st.rerun()
 
     champ = logic.bd_champion(bd)
