@@ -371,6 +371,43 @@ def _bd_mon_tile_html(tie, big=False, full_name=False):
     """
 
 
+# Streamlit's components.html() embeds this HTML in a plain <iframe> at
+# a fixed pixel height chosen up front in Python — but the actual content
+# height depends on how many ties/matches are live right now, which
+# Python doesn't know until the HTML is built. A fixed height that's
+# taller than the real content (the old min-height:850px + height=900
+# combo on the plain, non-kiosk Live Monitor) leaves a big empty slab of
+# the iframe's own background below the content — the "black box with
+# empty space" look. This script measures the real rendered height from
+# inside the iframe and posts it back to Streamlit's frontend, which
+# resizes the iframe element to match — the same postMessage protocol
+# Streamlit's own custom components use to size themselves, so it works
+# here too even though this is the plain static html() component rather
+# than a real custom component. Runs on load, on resize, and on any DOM
+# mutation (a tile appearing/disappearing as scores come in) so the
+# iframe keeps hugging its content instead of over- or under-sizing
+# itself. Included in both the plain monitor HTML and the kiosk's
+# live_only version, so it also tightens up _kiosk_iframe_height's
+# estimate rather than only fixing the non-kiosk page.
+_MONITOR_AUTOSIZE_JS = """
+<script>
+(function() {
+  function sendHeight() {
+    var h = document.documentElement.scrollHeight;
+    window.parent.postMessage({isStreamlitMessage: true, type: 'streamlit:setFrameHeight', height: h}, '*');
+  }
+  window.addEventListener('load', sendHeight);
+  window.addEventListener('resize', sendHeight);
+  if (window.ResizeObserver) {
+    new ResizeObserver(sendHeight).observe(document.body);
+  }
+  setTimeout(sendHeight, 50);
+  setInterval(sendHeight, 1000);
+})();
+</script>
+"""
+
+
 def _render_bd_monitor_html(bd, rounds, live_only=False):
     live = [t for t in bd["ties"].values() if _bd_tie_status(t) == "live" and t["id"].split("_")[0] in rounds]
     if live:
@@ -451,7 +488,7 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
     """
     html = f"""
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <div style="color-scheme:dark;background:#111110;padding:20px;border-radius:12px;font-family:'Inter',sans-serif;min-height:850px">
+    <div style="color-scheme:dark;background:#111110;padding:20px;border-radius:12px;font-family:'Inter',sans-serif">
       <div id="bd-live-now" class="{'bd-fs' if live_only else ''}">
         <div class="bd-fs-topbar" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px">
           <div style="display:flex;align-items:center;gap:8px">
@@ -638,6 +675,7 @@ def _render_bd_monitor_html(bd, rounds, live_only=False):
       .mon-tile-card::-webkit-scrollbar-track {{ background: transparent; }}
       .mon-tile-card::-webkit-scrollbar-thumb {{ background: #3a3a34; border-radius: 4px; }}
     </style>
+    {_MONITOR_AUTOSIZE_JS}
     """
     return html, len(live)
 
@@ -727,7 +765,7 @@ def render_badminton_monitor():
         rounds = st.multiselect("Show rounds", logic.ALL_BD_ROUNDS, default=logic.ALL_BD_ROUNDS,
                                  format_func=lambda r: logic.BD_ROUND_INFO[r]["label"], key="bd_mon_rounds")
         html, _ = _render_bd_monitor_html(bd, rounds)
-        components.html(html, height=900, scrolling=True)
+        components.html(html, height=400, scrolling=False)
         _live_autorefresh_wait(refresh_interval)
 
 
@@ -1057,7 +1095,7 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
     """
     html = f"""
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <div style="color-scheme:dark;background:#111110;padding:20px;border-radius:12px;font-family:'Inter',sans-serif;min-height:850px">
+    <div style="color-scheme:dark;background:#111110;padding:20px;border-radius:12px;font-family:'Inter',sans-serif">
       <div id="pk-live-now" class="{'pk-fs' if live_only else ''}">
         <div class="pk-fs-topbar" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px">
           <div style="display:flex;align-items:center;gap:8px">
@@ -1220,6 +1258,7 @@ def _render_pk_monitor_html(pk, rounds, live_only=False):
       .mon-tile-card::-webkit-scrollbar-track {{ background: transparent; }}
       .mon-tile-card::-webkit-scrollbar-thumb {{ background: #3a3a34; border-radius: 4px; }}
     </style>
+    {_MONITOR_AUTOSIZE_JS}
     """
     return html, len(live)
 
@@ -1257,7 +1296,7 @@ def render_pickleball_monitor():
         rounds = st.multiselect("Show rounds", logic.ALL_PK_ROUNDS, default=logic.ALL_PK_ROUNDS,
                                  format_func=lambda r: logic.PK_ROUND_LABELS[r], key="pk_mon_rounds")
         html, _ = _render_pk_monitor_html(pk, rounds)
-        components.html(html, height=900, scrolling=True)
+        components.html(html, height=400, scrolling=False)
         _live_autorefresh_wait(refresh_interval)
 
 
@@ -1304,10 +1343,19 @@ def _kiosk_bracket_html(sport, phase="all"):
     single-elimination bracket is far shorter to begin with (~975px vs
     badminton's ~1750px) and was already a reasonable fit uncropped, so
     phase is a no-op there (always the whole thing).
+
+    autoscroll=False is passed to both bracket renderers: this view already
+    solves visibility with the scale-to-fit transform below (the whole
+    bracket, or half of it, is always entirely on screen at once), so the
+    render_bracket_view_html/render_pk_bracket_view_html auto-scroll script
+    (built for the OTHER bracket view — the plain, unscaled one on the
+    regular Bracket View tab, where content can genuinely run wider than
+    the screen) has nothing useful to do here and would only fight the
+    scale/crop math with its own scroll offsets.
     """
     if sport == "bd":
         bd = state.load_bd()
-        inner = bracket_svg.render_bracket_view_html(bd)
+        inner = bracket_svg.render_bracket_view_html(bd, autoscroll=False)
         size = bracket_svg.canvas_size()
         icon, name = "🏸", "Badminton"
         w, h = size["w"], size["h"]
@@ -1320,7 +1368,7 @@ def _kiosk_bracket_html(sport, phase="all"):
             crop_y0, crop_y1 = 0, h
     else:
         pk = state.load_pk()
-        inner = bracket_svg.render_pk_bracket_view_html(pk)
+        inner = bracket_svg.render_pk_bracket_view_html(pk, autoscroll=False)
         size = bracket_svg.pk_canvas_size()
         icon, name = "🏓", "Pickleball"
         w, h = size["w"], size["h"]
