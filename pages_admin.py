@@ -23,7 +23,14 @@ def _render_game(gi, g, key_prefix, on_minus, on_plus, on_set, on_finish, on_reo
     if g["finished"]:
         winner = t1_name if g["p1"] > g["p2"] else t2_name
         summary = f"✅ {label} · {g['p1']}–{g['p2']} · {winner}"
-        with st.expander(summary, expanded=False):
+        # key is id-based, not built from the label text: the label changes
+        # every time the score changes, and an expander with no key (or a
+        # key derived from its own label) gets treated as a brand-new widget
+        # on that rerun — which resets it back to expanded=False regardless
+        # of whether the umpire had it open. A stable key keeps Streamlit
+        # tracking the SAME widget across reruns, so the open/closed state
+        # the umpire chose survives every score update.
+        with st.expander(summary, expanded=False, key=f"exp_{key_prefix}"):
             ui.score_row(label, g, on_minus=on_minus, on_plus=on_plus, on_set=on_set,
                          on_finish=on_finish, on_reopen=on_reopen, pts_target=pts_target,
                          key_prefix=key_prefix, t1_name=t1_name, t2_name=t2_name)
@@ -112,7 +119,7 @@ def _render_backup_restore_panel(sport):
     saver = state.save_bd if sport == "bd" else state.save_pk
     pending_key = f"_pending_restore_{sport}"
 
-    with st.expander(f"🗄️ {label} Data Backup / Restore", expanded=False):
+    with st.expander(f"🗄️ {label} Data Backup / Restore", expanded=False, key=f"exp_backup_{sport}"):
         st.caption(
             f"Use **Export** to download the current {label} bracket/groups and round schedule as one "
             "JSON file. Use **Restore** to load that file back in — this replaces the current "
@@ -174,7 +181,7 @@ def _render_routing_repair_panel():
     Safe to delete once you're confident every deployment includes the
     auto-heal in state.py."""
     bd = state.load_bd()  # auto-heals as a side effect of this call
-    with st.expander("🔧 Losers-bracket routing check", expanded=False):
+    with st.expander("🔧 Losers-bracket routing check", expanded=False, key="exp_routing_check"):
         st.caption(
             "The app now auto-repairs stale losers-bracket routing every time the bracket loads, so this "
             "should always show 'already up to date.' This panel is a manual fallback/confirmation only."
@@ -362,6 +369,17 @@ def _render_bd_tie_editor(tid, tie, pts, editable_structure=True):
                     pts_target=pts, t1_name=t1_name, t2_name=t2_name,
                 )
 
+        # Every category — decided or still live — gets ONE stable key,
+        # `exp_cat_{tid}_{ci}`, built only from the tie/category id. Both
+        # branches below construct their `summary` text from live data
+        # (the score, who's winning, which game is open) that changes on
+        # every point, so if the key were left to auto-derive from that
+        # summary (the default when no key= is passed), Streamlit would
+        # treat each score update as a brand-new expander and silently
+        # snap it back to expanded=False — which is exactly the "I open
+        # it, add a point, it collapses again" bug. Keying on the id
+        # instead of the label means the SAME widget persists across
+        # reruns, so the umpire's open/closed choice survives.
         if cat_winner:
             # Whole category decided (best-of-3 won 2-0 or 2-1) — collapse
             # it down to one line so a finished tie's 5 categories don't
@@ -370,7 +388,7 @@ def _render_bd_tie_editor(tid, tie, pts, editable_structure=True):
             wins1 = sum(1 for g in cat["games"] if g["finished"] and g["p1"] > g["p2"])
             wins2 = sum(1 for g in cat["games"] if g["finished"] and g["p2"] > g["p1"])
             summary = f"✅ {catname} — {winner_name} won {wins1}–{wins2}"
-            with st.expander(summary, expanded=False):
+            with st.expander(summary, expanded=False, key=f"exp_cat_{tid}_{ci}"):
                 _games(_render_game_plain)
         else:
             # Still live: collapse it the same way a finished category
@@ -395,7 +413,7 @@ def _render_bd_tie_editor(tid, tie, pts, editable_structure=True):
             else:
                 status = "in progress"
             summary = f"▶ {catname} — {status} ({wins1}–{wins2})"
-            with st.expander(summary, expanded=False):
+            with st.expander(summary, expanded=False, key=f"exp_cat_{tid}_{ci}"):
                 _games(_render_game_plain)
 
     if editable_structure:
@@ -511,7 +529,7 @@ def _render_pickleball_scoring(editable_structure: bool):
         st.caption("👀 You can enter and adjust scores. Pair names, group setup, and resets are locked to admins.")
 
     if editable_structure:
-        with st.expander("↺ Reset options", expanded=False):
+        with st.expander("↺ Reset options", expanded=False, key="exp_pk_reset_options"):
             r1, r2, r3 = st.columns(3)
             with r1:
                 st.button("Reset group scores", use_container_width=True,
@@ -600,7 +618,7 @@ def _render_pickleball_scoring(editable_structure: bool):
                 t2 = pairs[j]["name"] or f"Pair {j+1}"
                 m = logic.pk_get_match(pk, grp, i, j)
                 badge = " ✅" if m["winner"] else ""
-                with st.expander(f"{t1}  vs  {t2}{badge}"):
+                with st.expander(f"{t1}  vs  {t2}{badge}", key=f"exp_pk_{grp}_{i}_{j}"):
                     for gi in logic.visible_games(m["games"]):
                         g = m["games"][gi]
                         key_prefix = f"pk_{grp}_{i}_{j}_{gi}"
@@ -630,7 +648,7 @@ def _render_pickleball_scoring(editable_structure: bool):
             for tid in ids:
                 tie = pk["ko"][tid]
                 badge = " ✅" if tie["winner"] else ""
-                with st.expander(f"{tie['t1'] or 'TBD'}  vs  {tie['t2'] or 'TBD'}{badge}"):
+                with st.expander(f"{tie['t1'] or 'TBD'}  vs  {tie['t2'] or 'TBD'}{badge}", key=f"exp_pkko_{tid}"):
                     k1, k2 = f"pkko_{tid}_t1", f"pkko_{tid}_t2"
                     c1, c2 = st.columns(2)
                     c1.text_input("Pair A", value=tie["t1"], key=k1, on_change=_pk_ko_team_change, args=(tid, "t1", k1),
