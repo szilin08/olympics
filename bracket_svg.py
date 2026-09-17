@@ -313,11 +313,64 @@ def _pk_draw_lines():
     return s
 
 
-def render_pk_bracket_view_html(pk):
+# The bracket is drawn at a fixed pixel width wide enough to fit every
+# round as its own column (WB + LB + Grand Final for badminton is 11
+# columns), which is routinely much wider than a projector screen — on a
+# monitor left running unattended nobody's there to drag the horizontal
+# scrollbar, so anything past the first couple of rounds (the Grand Final,
+# in particular) would simply never be seen. This auto-scrolls the view
+# left-to-right and back on a loop so the whole bracket cycles into view
+# on its own. It only kicks in if the content actually overflows the
+# available width (checked at runtime, not assumed from the Python side)
+# so a bracket that already fits — pickleball's, most of the time — just
+# sits still instead of jittering pointlessly. SCROLL_SECONDS is the time
+# to travel across the full width in one direction; it pauses at each end
+# so the first/last round has a moment to actually be read before
+# reversing, rather than bouncing back the instant it arrives.
+def _autoscroll_script(scroll_seconds=30, pause_ms=4000):
+    return f"""
+    <script>
+    (function() {{
+      function run() {{
+        var maxScroll = document.documentElement.scrollWidth - window.innerWidth;
+        if (maxScroll <= 20) return;  // fits already — nothing to scroll
+        var duration = {scroll_seconds} * 1000;
+        var pause = {pause_ms};
+        var direction = 1;
+        var startTime = null;
+        function frame(ts) {{
+          if (startTime === null) startTime = ts;
+          var t = Math.min((ts - startTime) / duration, 1);
+          var x = direction === 1 ? t * maxScroll : (1 - t) * maxScroll;
+          window.scrollTo(x, 0);
+          if (t < 1) {{
+            requestAnimationFrame(frame);
+          }} else {{
+            direction *= -1;
+            setTimeout(function() {{ startTime = null; requestAnimationFrame(frame); }}, pause);
+          }}
+        }}
+        setTimeout(function() {{ requestAnimationFrame(frame); }}, pause);
+      }}
+      window.addEventListener('load', run);
+      setTimeout(run, 300);
+    }})();
+    </script>
+    """
+
+
+def render_pk_bracket_view_html(pk, autoscroll=True):
     """Returns a self-contained HTML fragment for st.components.v1.html —
     the pickleball single-elimination knockout tree (Round of 16 → QF → SF → Final),
     styled to match the pickleball Live Now monitor (same background, card, and
-    text colors) rather than the badminton bracket's navy/gold palette."""
+    text colors) rather than the badminton bracket's navy/gold palette.
+
+    autoscroll=False skips the auto-scroll script entirely — pass this from
+    a caller (like a kiosk page) that already guarantees the whole bracket
+    is visible some other way (e.g. a CSS scale-to-fit wrapper), since the
+    script would otherwise fight that wrapper's own layout math with
+    unwanted scroll offsets. Defaults to True for plain embeds where the
+    canvas can genuinely run wider than the viewport."""
     size = pk_canvas_size()
     w, h = size["w"], size["h"]
 
@@ -345,11 +398,15 @@ def render_pk_bracket_view_html(pk):
         {cards}
       </div>
     </div>
+    {_autoscroll_script() if autoscroll else ""}
     """
 
 
-def render_bracket_view_html(bd):
-    """Returns a self-contained HTML fragment for st.components.v1.html."""
+def render_bracket_view_html(bd, autoscroll=True):
+    """Returns a self-contained HTML fragment for st.components.v1.html.
+
+    autoscroll=False skips the auto-scroll script — see the matching
+    parameter on render_pk_bracket_view_html above for when to use it."""
     size = _canvas_size()
     w, h = size["w"], size["h"]
 
@@ -403,4 +460,5 @@ def render_bracket_view_html(bd):
         {cards}
       </div>
     </div>
+    {_autoscroll_script() if autoscroll else ""}
     """
