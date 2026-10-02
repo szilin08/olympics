@@ -282,14 +282,30 @@ def bd_reset_tie(bd, tie_id):
     tie["cats"] = [bd_blank_cat() for _ in range(5)]
     tie["winner"], tie["w1"], tie["w2"], tie["tbNeeded"] = None, 0, 0, False
 def bd_visible_games(games):
+    """Progressively reveal games in a best-of-N series (N is whatever
+    length `games` happens to be — 3 for every badminton category, and
+    either 3 or 5 for a pickleball match depending on its round): game 1
+    always shows; each next game only opens once the one before it is
+    finished; and revealing stops the moment someone has already clinched
+    enough game-wins to win the series, so a 2-0 best-of-3 (or a 3-0/3-1
+    best-of-5) never shows a game that was never going to be played.
+    For N=3 this reproduces the original hardcoded logic exactly: game 3
+    only appears once games 1-2 are finished AND split 1-1."""
+    n = len(games)
+    threshold = n // 2 + 1  # game-wins needed to clinch the series
     show = [0]
-    if games[0]["finished"]:
-        show.append(1)
-    if games[0]["finished"] and games[1]["finished"]:
-        w0 = 1 if games[0]["p1"] > games[0]["p2"] else 2
-        w1 = 1 if games[1]["p1"] > games[1]["p2"] else 2
-        if w0 != w1:
-            show.append(2)
+    w1 = w2 = 0
+    for gi in range(n - 1):
+        g = games[gi]
+        if not g["finished"]:
+            break
+        if g["p1"] > g["p2"]:
+            w1 += 1
+        else:
+            w2 += 1
+        if w1 >= threshold or w2 >= threshold:
+            break
+        show.append(gi + 1)
     return show
 def bd_current_activity(tie):
     """What's actually being played right now within a tie: which category,
@@ -348,6 +364,12 @@ def pk_blank_game():
     return {"p1": 0, "p2": 0, "finished": False}
 def pk_blank_match():
     return {"games": [pk_blank_game(), pk_blank_game(), pk_blank_game()], "winner": None}
+PK_BO5_ROUNDS = ("K3", "GF")  # Semi-Final and Final are best-of-5; everything else (Group, K1, K2) is best-of-3
+def pk_ko_game_count(tid):
+    round_id = tid.split("_")[0] if "_" in tid else tid
+    return 5 if round_id in PK_BO5_ROUNDS else 3
+def pk_blank_ko_games(tid):
+    return [pk_blank_game() for _ in range(pk_ko_game_count(tid))]
 def pk_init_default():
     groups = {
         "A": [{"name": ""} for _ in range(6)],
@@ -362,7 +384,7 @@ def pk_init_ko():
     K = {}
     def mk(tid, wt=None, ws=0):
         K[tid] = {"id": tid, "t1": "", "t2": "", "wt": wt, "ws": ws, "winner": None,
-                   "games": [pk_blank_game(), pk_blank_game(), pk_blank_game()]}
+                   "games": pk_blank_ko_games(tid)}
     mk("K1_0", "K2_0", 1); mk("K1_1", "K2_0", 2)
     mk("K1_2", "K2_1", 1); mk("K1_3", "K2_1", 2)
     mk("K1_4", "K2_2", 1); mk("K1_5", "K2_2", 2)
@@ -372,6 +394,31 @@ def pk_init_ko():
     mk("K3_0", "GF", 1); mk("K3_1", "GF", 2)
     mk("GF")
     return K
+def pk_needs_bo5_migration(pk):
+    """True if any Semi-Final/Final tie in a saved pk state still has the
+    old best-of-3 game list instead of the best-of-5 one those two rounds
+    now use. Group play and K1/K2 stay best-of-3 forever, so their ties
+    are never flagged here — only K3_0, K3_1 and GF are ever affected."""
+    ko = pk.get("ko", {})
+    for tid, tie in ko.items():
+        if pk_ko_game_count(tid) == 5 and len(tie.get("games", [])) < 5:
+            return True
+    return False
+def pk_migrate_bo5(pk):
+    """One-time upgrade for a bracket saved before Semi-Final/Final became
+    best-of-5: pads K3_0/K3_1/GF's game list up to 5 slots, keeping every
+    score already entered in games 1-3 exactly as it was, then re-derives
+    each tie's winner against the new first-to-3 threshold (a tie that was
+    already 2-0 stays decided; a 2-1 no longer is, since game 4 is now a
+    real game rather than a game that never existed)."""
+    ko = pk.get("ko", {})
+    for tid, tie in ko.items():
+        want = pk_ko_game_count(tid)
+        games = tie.get("games", [])
+        if len(games) < want:
+            tie["games"] = games + [pk_blank_game() for _ in range(want - len(games))]
+        tie["winner"] = pk_match_winner(tie)
+    return pk
 def pk_get_match(pk, grp, i, j):
     pk["matches"].setdefault(grp, {})
     key = f"{i}-{j}"
@@ -381,19 +428,26 @@ def pk_get_match(pk, grp, i, j):
 def pk_get_match_if_exists(pk, grp, i, j):
     return pk["matches"].get(grp, {}).get(f"{i}-{j}")
 def pk_match_winner(m):
+    """First to clinch a majority of games in the series wins — threshold
+    is derived from however many games this particular match/tie actually
+    has (3 for group matches and K1/K2 knockout rounds, 5 for the K3
+    Semi-Final and GF Final), so group play stays first-to-2 while semis
+    and the final become first-to-3, with no other logic changes needed."""
+    games = m["games"]
+    threshold = len(games) // 2 + 1
     w1 = w2 = 0
-    for g in m["games"]:
+    for g in games:
         if not g["finished"]:
             continue
         if g["p1"] > g["p2"]:
             w1 += 1
         elif g["p2"] > g["p1"]:
             w2 += 1
-        if w1 == 2 or w2 == 2:
+        if w1 >= threshold or w2 >= threshold:
             break
-    if w1 == 2:
+    if w1 >= threshold:
         return 1
-    if w2 == 2:
+    if w2 >= threshold:
         return 2
     return None
 def pk_point(pk, grp, i, j, gi, who, delta):
@@ -524,7 +578,7 @@ def pk_ko_set_team(pk, tie_id, which, val):
 def pk_ko_reset_tie(pk, tie_id):
     tie = pk["ko"][tie_id]
     pk_ko_clear_downstream(pk, tie)
-    tie["games"] = [pk_blank_game(), pk_blank_game(), pk_blank_game()]
+    tie["games"] = pk_blank_ko_games(tie_id)
     tie["winner"] = None
 def pk_champion(pk):
     gf = pk["ko"].get("GF")
