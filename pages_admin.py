@@ -8,7 +8,7 @@ import logic
 import state
 import ui
 
-PK_PTS = 15  # pickleball is always best-of-3 to 15, per the tournament rules
+PK_PTS = 15  # every pickleball game is to 15 pts; best-of-3 for Group/R16/QF, best-of-5 for Semis & Final (see logic.PK_BO5_ROUNDS)
 
 
 def _render_game(gi, g, key_prefix, on_minus, on_plus, on_set, on_finish, on_reopen,
@@ -557,12 +557,14 @@ def render_pickleball_umpire():
 def _render_pickleball_scoring(editable_structure: bool):
     if editable_structure:
         ui.page_header("Pickleball", "Pickleball — Admin",
-                        "22 pairs · 4 groups · Top 4 per group advance · Mixed doubles · Best of 3 to 15 pts",
+                        "22 pairs · 4 groups · Top 4 per group advance · Mixed doubles · "
+                        "Best of 3 to 15 pts (Best of 5 from Semis)",
                         "Admin mode", "navy")
         _render_backup_restore_panel("pk")
     else:
         ui.page_header("Pickleball", "Pickleball — Umpiring",
-                        "4 groups · Top 4 per group advance · Mixed doubles · Best of 3 to 15 pts",
+                        "4 groups · Top 4 per group advance · Mixed doubles · "
+                        "Best of 3 to 15 pts (Best of 5 from Semis)",
                         "Umpire mode", "gold")
         st.caption("👀 You can enter and adjust scores. Pair names, group setup, and resets are locked to admins.")
 
@@ -683,6 +685,10 @@ def _render_pickleball_scoring(editable_structure: bool):
             if not ids:
                 continue
             st.subheader(logic.PK_ROUND_LABELS[r])
+            if r in logic.PK_BO5_ROUNDS:
+                st.caption("🔥 Best of 5 — first pair to win 3 games takes the tie.")
+            else:
+                st.caption("Best of 3 — first pair to win 2 games takes the tie.")
             for tid in ids:
                 tie = pk["ko"][tid]
                 badge = " ✅" if tie["winner"] else ""
