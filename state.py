@@ -25,6 +25,13 @@ def load_pk():
     if not pk or not pk.get("groups"):
         pk = logic.pk_init_default()
         db.set_state(PK_KEY, pk, actor="system", action="init")
+    elif logic.pk_needs_bo5_migration(pk):
+        # Semi-Final/Final used to be best-of-3 like every other round;
+        # a bracket saved before that changed still has 3-game K3/GF
+        # ties, so pad them up to 5 (keeping existing scores) every time
+        # one is loaded, same auto-heal pattern as load_bd's routing fix.
+        pk = logic.pk_migrate_bo5(pk)
+        db.set_state(PK_KEY, pk, actor="system", action="migrate_bo5")
     return pk
 
 
